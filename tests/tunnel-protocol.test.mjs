@@ -4,6 +4,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import net from 'node:net';
+import { createHash, createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
@@ -53,8 +54,8 @@ after(async () => {
   if (server?.listening) await new Promise(resolve => server.close(resolve));
 });
 
-async function openWebSocket() {
-  const response = await mf.dispatchFetch('https://tunnel.example.com/', {
+async function openWebSocket(path = '/') {
+  const response = await mf.dispatchFetch(`https://tunnel.example.com${path}`, {
     headers: { Upgrade: 'websocket', 'User-Agent': 'Brclio-Protocol-QA' },
   });
   assert.equal(response.status, 101);
@@ -151,3 +152,362 @@ test('built Worker forwards authenticated VLESS WebSocket data through a real lo
     try { ws.close(); } catch {}
   }
 });
+
+// Independent clients below use Node's native crypto and wire encoders instead
+// of importing the Worker's parser or encryption helpers. This makes a broken
+// shared encoder/decoder unable to manufacture a successful round trip.
+const wrongUuid = '00000000-0000-4000-8000-000000000002';
+const continuation = Buffer.from(Array.from({ length: 65536 }, (_, index) => index % 251));
+
+function trojanHandshake(id, payload) {
+  return Buffer.concat([
+    Buffer.from(createHash('sha224').update(id).digest('hex') + '\r\n'),
+    Buffer.from([1, 1, 127, 0, 0, 1, tcpPort >> 8, tcpPort & 255, 13, 10]),
+    payload,
+  ]);
+}
+
+function assertSameBytes(actual, expected, label) {
+  assert.equal(actual.length, expected.length, `${label}: byte count`);
+  assert.equal(createHash('sha256').update(actual).digest('hex'),
+    createHash('sha256').update(expected).digest('hex'), `${label}: exact byte content`);
+}
+
+async function rejectWebSocketPayload(path, payload) {
+  const connectionsBefore = acceptedConnections;
+  const ws = await openWebSocket(path);
+  let receivedBytes = 0;
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Invalid handshake was not closed')), 5000);
+      ws.addEventListener('message', event => { receivedBytes += Buffer.from(event.data).length; });
+      ws.addEventListener('close', () => { clearTimeout(timer); resolve(); }, { once: true });
+      ws.send(payload);
+    });
+    assert.equal(receivedBytes, 0, 'Rejected requests must not receive destination data');
+    assert.equal(acceptedConnections, connectionsBefore, 'Rejected requests must not dial TCP');
+  } finally {
+    try { ws.close(); } catch {}
+  }
+}
+
+test('Trojan WebSocket authenticates and forwards first plus continuation bytes through local TCP', { timeout: 15000 }, async () => {
+  const connectionsBefore = acceptedConnections;
+  const ws = await openWebSocket();
+  try {
+    const greeting = Buffer.from('Trojan initial payload: binary\x00\xff');
+    const first = await receiveBytes(ws, greeting.length, () => ws.send(trojanHandshake(uuid, greeting)));
+    assertSameBytes(first, greeting, 'Trojan first response has no VLESS header');
+    const next = await receiveBytes(ws, continuation.length, () => {
+      for (let offset = 0; offset < continuation.length; offset += 4096) ws.send(continuation.subarray(offset, offset + 4096));
+    });
+    assertSameBytes(next, continuation, 'Trojan continuation');
+    assert.equal(acceptedConnections, connectionsBefore + 1);
+  } finally {
+    try { ws.close(); } catch {}
+  }
+});
+
+test('Trojan WebSocket rejects a wrong password before opening local TCP', { timeout: 10000 }, async () => {
+  await rejectWebSocketPayload('/', trojanHandshake(wrongUuid, Buffer.from('must-not-reach-tcp')));
+});
+
+// Shadowsocks SIP004: EVP_BytesToKey(MD5), HKDF-SHA1(ss-subkey), AES-GCM,
+// separate length/payload records, little-endian 96-bit per-direction nonces.
+function ssSessionKey(password, salt, keyLength) {
+  let previous = Buffer.alloc(0);
+  let derived = Buffer.alloc(0);
+  while (derived.length < keyLength) {
+    previous = createHash('md5').update(previous).update(password).digest();
+    derived = Buffer.concat([derived, previous]);
+  }
+  return Buffer.from(hkdfSync('sha1', derived.subarray(0, keyLength), salt, 'ss-subkey', keyLength));
+}
+
+function nextNonce(counter) {
+  const nonce = Buffer.alloc(12);
+  nonce.writeBigUInt64LE(counter);
+  return nonce;
+}
+
+function ssEncoder(method, password) {
+  const keyLength = method === 'aes-128-gcm' ? 16 : 32;
+  const salt = randomBytes(keyLength);
+  const key = ssSessionKey(password, salt, keyLength);
+  let nonce = 0n;
+  let sentSalt = false;
+  function encrypt(plain) {
+    const cipher = createCipheriv(method, key, nextNonce(nonce++));
+    return Buffer.concat([cipher.update(plain), cipher.final(), cipher.getAuthTag()]);
+  }
+  return plain => {
+    const records = sentSalt ? [] : [salt];
+    sentSalt = true;
+    for (let offset = 0; offset < plain.length; offset += 0x3fff) {
+      const chunk = plain.subarray(offset, offset + 0x3fff);
+      const length = Buffer.alloc(2);
+      length.writeUInt16BE(chunk.length);
+      records.push(encrypt(length), encrypt(chunk));
+    }
+    return Buffer.concat(records);
+  };
+}
+
+function ssDecoder(method, password) {
+  const keyLength = method === 'aes-128-gcm' ? 16 : 32;
+  let pending = Buffer.alloc(0);
+  let key;
+  let nonce = 0n;
+  let payloadLength = null;
+  function decrypt(encrypted) {
+    const decipher = createDecipheriv(method, key, nextNonce(nonce++));
+    decipher.setAuthTag(encrypted.subarray(-16));
+    return Buffer.concat([decipher.update(encrypted.subarray(0, -16)), decipher.final()]);
+  }
+  return chunk => {
+    pending = Buffer.concat([pending, chunk]);
+    if (!key) {
+      if (pending.length < keyLength) return Buffer.alloc(0);
+      key = ssSessionKey(password, pending.subarray(0, keyLength), keyLength);
+      pending = pending.subarray(keyLength);
+    }
+    const output = [];
+    while (true) {
+      if (payloadLength === null) {
+        if (pending.length < 18) break;
+        payloadLength = decrypt(pending.subarray(0, 18)).readUInt16BE();
+        assert.ok(payloadLength <= 0x3fff, 'SS response obeys maximum record size');
+        pending = pending.subarray(18);
+      }
+      if (pending.length < payloadLength + 16) break;
+      output.push(decrypt(pending.subarray(0, payloadLength + 16)));
+      pending = pending.subarray(payloadLength + 16);
+      payloadLength = null;
+    }
+    return Buffer.concat(output);
+  };
+}
+
+function receiveDecodedWebSocket(ws, decode, expectedLength, send) {
+  return new Promise((resolve, reject) => {
+    const output = [];
+    let length = 0;
+    const timer = setTimeout(() => finish(new Error(`SS echo timed out (${length}/${expectedLength})`)), 5000);
+    function finish(error) {
+      clearTimeout(timer);
+      ws.removeEventListener('message', onMessage);
+      ws.removeEventListener('close', onClose);
+      if (error) reject(error);
+      else resolve(Buffer.concat(output));
+    }
+    function onMessage(event) {
+      try {
+        const plain = decode(Buffer.from(event.data));
+        output.push(plain);
+        length += plain.length;
+        if (length >= expectedLength) finish();
+      } catch (error) { finish(error); }
+    }
+    function onClose() { finish(new Error('SS WebSocket closed before the echo')); }
+    ws.addEventListener('message', onMessage);
+    ws.addEventListener('close', onClose);
+    try { send(); } catch (error) { finish(error); }
+  });
+}
+
+for (const method of ['aes-128-gcm', 'aes-256-gcm']) {
+  test(`Shadowsocks ${method} WebSocket decrypts/encrypts first and continuation data through local TCP`, { timeout: 15000 }, async () => {
+    const connectionsBefore = acceptedConnections;
+    const ws = await openWebSocket(`/?enc=${method}`);
+    const encode = ssEncoder(method, uuid);
+    const decode = ssDecoder(method, uuid);
+    try {
+      const greeting = Buffer.from(`Shadowsocks ${method} first payload\x00`);
+      const address = Buffer.from([1, 127, 0, 0, 1, tcpPort >> 8, tcpPort & 255]);
+      const firstFrame = encode(Buffer.concat([address, greeting]));
+      const first = await receiveDecodedWebSocket(ws, decode, greeting.length, () => {
+        // Fragment the salt and AEAD records across actual WebSocket messages.
+        ws.send(firstFrame.subarray(0, 7));
+        ws.send(firstFrame.subarray(7, 23));
+        ws.send(firstFrame.subarray(23));
+      });
+      assertSameBytes(first, greeting, `${method} first response`);
+      const next = await receiveDecodedWebSocket(ws, decode, continuation.length, () => {
+        const frame = encode(continuation);
+        for (let offset = 0; offset < frame.length; offset += 4096) ws.send(frame.subarray(offset, offset + 4096));
+      });
+      assertSameBytes(next, continuation, `${method} continuation`);
+      assert.equal(acceptedConnections, connectionsBefore + 1);
+    } finally {
+      try { ws.close(); } catch {}
+    }
+  });
+
+  test(`Shadowsocks ${method} WebSocket rejects a wrong password before local TCP`, { timeout: 10000 }, async () => {
+    const encode = ssEncoder(method, wrongUuid);
+    const address = Buffer.from([1, 127, 0, 0, 1, tcpPort >> 8, tcpPort & 255]);
+    await rejectWebSocketPayload(`/?enc=${method}`, encode(Buffer.concat([address, Buffer.alloc(96, 65)])));
+  });
+}
+
+function varint(value) {
+  const bytes = [];
+  while (value > 127) { bytes.push((value & 127) | 128); value >>>= 7; }
+  bytes.push(value);
+  return Buffer.from(bytes);
+}
+
+// Official Xray wire schema: Hunk { bytes data = 1; },
+// MultiHunk { repeated bytes data = 1; }. A genuine multi test must encode
+// multiple protobuf fields in ONE gRPC message, not just change the URL.
+// https://github.com/XTLS/Xray-core/blob/main/transport/internet/grpc/encoding/stream.proto
+function grpcFrame(fields) {
+  const message = Buffer.concat(fields.flatMap(field => [Buffer.from([10]), varint(field.length), field]));
+  const header = Buffer.alloc(5);
+  header.writeUInt32BE(message.length, 1);
+  return Buffer.concat([header, message]);
+}
+
+function grpcDecoder() {
+  let pending = Buffer.alloc(0);
+  return chunk => {
+    pending = Buffer.concat([pending, chunk]);
+    const output = [];
+    while (pending.length >= 5) {
+      assert.equal(pending[0], 0, 'Uncompressed gRPC envelope');
+      const length = pending.readUInt32BE(1);
+      if (pending.length < 5 + length) break;
+      const message = pending.subarray(5, 5 + length);
+      pending = pending.subarray(5 + length);
+      let offset = 0;
+      while (offset < message.length) {
+        assert.equal(message[offset++], 10, 'Response protobuf field is bytes data = 1');
+        let fieldLength = 0;
+        let shift = 0;
+        let byte;
+        do {
+          assert.ok(offset < message.length && shift <= 28, 'Valid protobuf length');
+          byte = message[offset++];
+          fieldLength += (byte & 127) * 2 ** shift;
+          shift += 7;
+        } while (byte & 128);
+        assert.ok(offset + fieldLength <= message.length, 'Complete protobuf bytes field');
+        output.push(message.subarray(offset, offset + fieldLength));
+        offset += fieldLength;
+      }
+    }
+    return Buffer.concat(output);
+  };
+}
+
+function withTimeout(promise, label, ms = 5000) {
+  let timer;
+  return Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(label)), ms); })])
+    .finally(() => clearTimeout(timer));
+}
+
+async function openHttpTunnel(transport, initial, endUpload = false) {
+  let upload;
+  const body = new ReadableStream({ start(controller) { upload = controller; } });
+  const isGrpc = transport.startsWith('grpc');
+  const path = transport === 'grpc-multi' ? '/local-test/TunMulti' : isGrpc ? '/local-test/Tun' : '/local-test';
+  // Deliberately split a gRPC envelope / protocol header across HTTP chunks.
+  upload.enqueue(initial.subarray(0, 2));
+  upload.enqueue(initial.subarray(2, 13));
+  upload.enqueue(initial.subarray(13));
+  if (endUpload) upload.close();
+  const response = await withTimeout(mf.dispatchFetch(`https://tunnel.example.com${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': isGrpc ? 'application/grpc' : 'application/octet-stream', 'User-Agent': 'Brclio-Protocol-QA' },
+    body,
+    duplex: 'half',
+  }), `${transport} initial response timed out`);
+  const reader = response.body.getReader();
+  const decode = isGrpc ? grpcDecoder() : bytes => bytes;
+  let pending = Buffer.alloc(0);
+  return {
+    response,
+    send(bytes) { upload.enqueue(bytes); },
+    endUpload() { try { upload.close(); } catch {} },
+    async readBytes(length) {
+      return withTimeout((async () => {
+        while (pending.length < length) {
+          const result = await reader.read();
+          if (result.done) throw new Error(`${transport} response ended after ${pending.length}/${length} bytes`);
+          pending = Buffer.concat([pending, decode(Buffer.from(result.value))]);
+        }
+        const out = pending.subarray(0, length);
+        pending = pending.subarray(length);
+        return out;
+      })(), `${transport} echo timed out`);
+    },
+    async readToEnd() {
+      return withTimeout((async () => {
+        const parts = [pending];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) return Buffer.concat(parts);
+          parts.push(decode(Buffer.from(value)));
+        }
+      })(), `${transport} rejection did not finish`);
+    },
+    async close() {
+      try { upload.close(); } catch {}
+      await reader.cancel().catch(() => {});
+    },
+  };
+}
+
+for (const [protocol, handshake] of [['VLESS', vlessHandshake], ['Trojan', trojanHandshake]]) {
+  for (const transport of ['grpc-gun', 'grpc-multi', 'xhttp']) {
+    test(`${protocol} ${transport} carries first and continuation bytes through local TCP`, { timeout: 15000 }, async () => {
+      const connectionsBefore = acceptedConnections;
+      const greeting = Buffer.from(`${protocol} ${transport} first payload\x00`);
+      const firstHalf = greeting.subarray(0, 8);
+      const secondHalf = greeting.subarray(8);
+      const initial = transport === 'grpc-multi'
+        ? grpcFrame([handshake(uuid, firstHalf), secondHalf])
+        : transport === 'grpc-gun' ? grpcFrame([handshake(uuid, greeting)]) : handshake(uuid, greeting);
+      const tunnel = await openHttpTunnel(transport, initial);
+      try {
+        assert.equal(tunnel.response.status, 200);
+        const expectedFirst = protocol === 'VLESS' ? Buffer.concat([Buffer.from([0, 0]), greeting]) : greeting;
+        assertSameBytes(await tunnel.readBytes(expectedFirst.length), expectedFirst, `${protocol} ${transport} first response`);
+        for (let offset = 0; offset < continuation.length; offset += 4096) {
+          const chunk = continuation.subarray(offset, offset + 4096);
+          tunnel.send(transport === 'grpc-multi' ? grpcFrame([chunk.subarray(0, 17), chunk.subarray(17)])
+            : transport === 'grpc-gun' ? grpcFrame([chunk]) : chunk);
+        }
+        assertSameBytes(await tunnel.readBytes(continuation.length), continuation, `${protocol} ${transport} continuation`);
+        assert.equal(acceptedConnections, connectionsBefore + 1, 'Continuation reuses the authenticated TCP connection');
+      } finally {
+        await tunnel.close();
+      }
+    });
+
+    test(`${protocol} ${transport} rejects a wrong credential without local TCP`, { timeout: 10000 }, async () => {
+      const connectionsBefore = acceptedConnections;
+      const invalid = handshake(wrongUuid, Buffer.from('must-not-reach-tcp'));
+      const initial = transport.startsWith('grpc') ? grpcFrame([invalid]) : invalid;
+      // A short invalid VLESS header may still be a partial Trojan header;
+      // close the request to establish EOF rather than waiting on each other.
+      const tunnel = await openHttpTunnel(transport, initial, true);
+      try {
+        tunnel.endUpload();
+        const response = await tunnel.readToEnd();
+        if (transport === 'xhttp') {
+          assert.equal(tunnel.response.status, 400);
+          assert.equal(response.toString(), 'Invalid request');
+        } else {
+          // Upstream closes gRPC body on authentication failure; HTTP status
+          // remains 200, so status alone is not evidence of authentication.
+          assert.equal(tunnel.response.status, 200);
+          assert.equal(response.length, 0);
+        }
+        assert.equal(acceptedConnections, connectionsBefore, 'Wrong credentials must never dial TCP');
+      } finally {
+        await tunnel.close();
+      }
+    });
+  }
+}

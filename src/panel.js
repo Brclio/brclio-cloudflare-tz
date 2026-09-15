@@ -9,7 +9,7 @@ export const panelHeaders = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'X-Frame-Options': 'DENY',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 };
 export function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), { status, headers: { ...panelHeaders, 'Content-Type': 'application/json; charset=utf-8', ...headers } });
@@ -127,7 +127,7 @@ export function validateConfig(config) {
     ['TG.启用', config.TG.启用], ['SS.TLS', config.SS.TLS],
     ['优选订阅生成.local', config.优选订阅生成.local], ['本地IP库.随机IP', pool.随机IP],
     ['反代.SOCKS5.全局', config.反代.SOCKS5.全局],
-    ...['SUBEMOJI', 'SUBLIST', 'UDP', 'XUDP', 'TLS13', 'APPEND_TYPE', 'SORT'].map(key => [`订阅转换配置.${key}`, config.订阅转换配置[key]]),
+    ...['SUBEMOJI', 'SUBLIST', 'UDP', 'XUDP', 'TLS13', 'APPEND_TYPE', 'SORT', 'EXPAND'].map(key => [`订阅转换配置.${key}`, config.订阅转换配置[key]]),
   ];
   for (const [key, value] of booleans) if (typeof value !== 'boolean') return `${key} 必须为 true 或 false`;
   if (!['aes-128-gcm', 'aes-256-gcm'].includes(config.SS.加密方式)) return 'Shadowsocks 仅支持 aes-128-gcm 或 aes-256-gcm';

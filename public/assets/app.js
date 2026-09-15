@@ -3,7 +3,7 @@
 
 const $ = (id) => document.getElementById(id);
 const state = { config: null, baseline: '', meta: null, logs: [], logsLoaded: false, logPage: 0, addressesBaseline: '', addressesLoaded: false, rawDirty: false, cfDirty: false, tgDirty: false, busy: false, page: 'overview' };
-const pageNames = { overview: '概览', nodes: '节点配置', subscriptions: '订阅管理', routing: '路由与代理', logs: '访问日志', settings: '设置' };
+const pageNames = { overview: '概览', nodes: '节点配置', subscriptions: '订阅管理', speedtest: '测速与优选', routing: '路由与代理', logs: '访问日志', settings: '设置' };
 const bindings = [];
 const PAGE_SIZE = 25;
 let fieldSequence = 0;
@@ -78,7 +78,7 @@ async function api(path, { method = 'GET', data, text = false, signal } = {}) {
   let parsed;
   try { parsed = body ? JSON.parse(body) : {}; } catch { parsed = null; }
   if (!response.ok) throw new Error(parsed?.error || parsed?.message || '请求未完成（HTTP ' + response.status + '），请重试。');
-  if (parsed?.success === false || parsed?.error) throw new Error(parsed.error || parsed.message || '保存失败，请检查配置。');
+  if (parsed?.success === false || parsed?.error) throw new Error(parsed.error || parsed.message || parsed.msg || '请求未完成，请检查配置。');
   if (text) return body;
   if (parsed === null) throw new Error('服务器返回了无法识别的内容，请刷新页面后重试。');
   return parsed;
@@ -113,9 +113,9 @@ const schema = {
     { label: '节点协议', path: ['协议类型'], type: 'select', options: [['vless', 'VLESS'], ['trojan', 'Trojan'], ['ss', 'Shadowsocks']] },
     { label: '传输协议', path: ['传输协议'], type: 'select', options: [['ws', 'WebSocket'], ['grpc', 'gRPC'], ['xhttp', 'XHTTP']] },
     { label: 'gRPC 模式', path: ['gRPC模式'], type: 'select', options: [['gun', 'gun（单流）'], ['multi', 'multi（多流）']], hint: '仅使用 gRPC 时生效。' },
-    { label: 'gRPC User-Agent', path: ['gRPCUserAgent'], hint: '用于 gRPC 订阅处理的客户端标识。' },
+    { label: 'gRPC User-Agent', path: ['gRPCUserAgent'], action: 'current-ua', hint: '用于 gRPC 订阅处理的客户端标识。' },
     { label: 'Shadowsocks 加密方式', path: ['SS', '加密方式'], type: 'select', options: ['aes-128-gcm', 'aes-256-gcm'], hint: '仅 Shadowsocks 生效。' },
-    { label: 'Shadowsocks TLS', path: ['SS', 'TLS'], type: 'boolean', hint: '为 Shadowsocks WebSocket 连接启用 TLS。' },
+    { label: 'Shadowsocks TLS', path: ['SS', 'TLS'], type: 'boolean', confirmDisable: true, hint: '为 Shadowsocks WebSocket 连接启用 TLS。关闭前会提示部署与 HTTP 端口要求。' },
   ],
   'node-security-fields': [
     { label: '浏览器指纹', path: ['Fingerprint'], type: 'select', options: ['chrome', 'firefox', 'safari', 'ios', 'android', 'edge', 'random', 'randomized'] },
@@ -125,8 +125,8 @@ const schema = {
     { label: '0-RTT', path: ['启用0RTT'], type: 'boolean', hint: '向节点路径加入早期数据参数。' },
     { label: '随机路径', path: ['随机路径'], type: 'boolean', hint: '生成订阅时使用随机路径。' },
     { label: 'ECH', path: ['ECH'], type: 'boolean', hint: '加密 ClientHello，需要客户端支持。' },
-    { label: 'ECH DNS', path: ['ECHConfig', 'DNS'], placeholder: 'https://dns.alidns.com/dns-query' },
-    { label: 'ECH SNI', path: ['ECHConfig', 'SNI'], placeholder: 'cloudflare-ech.com' },
+    { label: 'ECH DNS', path: ['ECHConfig', 'DNS'], placeholder: 'https://dns.alidns.com/dns-query', presets: ['https://dns.alidns.com/dns-query', 'https://sm2.doh.pub/dns-query', 'https://doh.360.cn/dns-query', 'https://doh.onedns.net/dns-query', 'https://doh.applied-privacy.net/query', 'https://odvr.nic.cz/doh', 'udp://208.67.220.220:443', 'udp://149.112.112.112:9953', 'udp://45.90.28.0:5353', 'udp://188.166.206.224:5003'], hint: '可输入自定义地址，或从下拉建议选择上游提供的 DNS。' },
+    { label: 'ECH SNI', path: ['ECHConfig', 'SNI'], placeholder: '留空自动使用节点域名', presets: ['cloudflare-ech.com', 'crypto.cloudflare.com', 'encryptedsni.com', 'icook.hk', 'cm.edu.kg', 'godotengine.org', 'www.britannica.com', 'www.prometheus.io', 'www.kyocera.com', 'celestia.org', 'lido.fi'], hint: '用于解析 ECH Config 的域名；留空自动使用节点域名。' },
   ],
   'subscription-fields': [
     { label: '优选来源', path: ['优选订阅生成', 'local'], type: 'select', booleanSelect: true, options: [['true', '本地地址库'], ['false', '远程订阅生成器']] },
@@ -146,6 +146,7 @@ const schema = {
     { label: 'TLS 1.3', path: ['订阅转换配置', 'TLS13'], type: 'boolean' },
     { label: '名称附加节点类型', path: ['订阅转换配置', 'APPEND_TYPE'], type: 'boolean' },
     { label: '节点排序', path: ['订阅转换配置', 'SORT'], type: 'boolean' },
+    { label: '展开规则全文', path: ['订阅转换配置', 'EXPAND'], type: 'boolean', hint: '向转换后端请求完整分流规则列表。' },
   ],
   'routing-fields': [
     { label: '反代出口', path: ['反代', 'PROXYIP'], placeholder: 'auto', full: true, hint: 'auto 自动选择；也可输入你自己的 IP 或域名及端口。' },
@@ -158,6 +159,10 @@ const schema = {
   ],
   'tg-toggle-field': [{ label: '启用 Telegram 日志通知', path: ['TG', '启用'], type: 'boolean', full: true, hint: '开启并保存主配置后，新的日志事件才会发送到你的 Telegram。' }],
 };
+schema['routing-template-fields'] = [{ label: 'PROXYIP 路径模板', path: ['反代', '路径模板', 'PROXYIP'], full: true, placeholder: 'proxyip={{IP:PORT}}' }];
+for (const type of ['SOCKS5', 'HTTP', 'HTTPS', 'TURN', 'SSTP']) {
+  for (const mode of ['标准', '全局']) schema['routing-template-fields'].push({ label: type + ' ' + mode + '路径', path: ['反代', '路径模板', type, mode], placeholder: type.toLowerCase() + (mode === '全局' ? '://' : '=') + '{{IP:PORT}}' });
+}
 
 function createField(spec, { value, onChange, separate = false } = {}) {
   const wrapper = el('div', 'field' + (spec.full ? ' full-width' : ''));
@@ -209,9 +214,17 @@ function createField(spec, { value, onChange, separate = false } = {}) {
       });
       secret.append(reveal); wrapper.append(secret);
     } else wrapper.append(input);
+    if (spec.presets) {
+      const options = el('datalist'); options.id = id + '-presets'; input.setAttribute('list', options.id);
+      spec.presets.forEach((value) => { const option = el('option'); option.value = value; options.append(option); }); wrapper.append(options);
+    }
+    if (spec.action === 'current-ua') {
+      const action = el('button', 'button button-small field-inline-action', '获取当前浏览器 UA'); action.type = 'button';
+      action.addEventListener('click', () => { input.value = navigator.userAgent; input.dispatchEvent(new Event('input', { bubbles: true })); toast('已填写当前浏览器 User-Agent，请保存配置。'); }); wrapper.append(action);
+    }
     if (spec.hint) { const hint = el('p', 'field-hint', spec.hint); hint.id = id + '-hint'; input.setAttribute('aria-describedby', hint.id); wrapper.append(hint); }
   }
-  input.addEventListener(spec.type === 'select' || spec.type === 'boolean' ? 'change' : 'input', () => {
+  input.addEventListener(spec.type === 'select' || spec.type === 'boolean' ? 'change' : 'input', async () => {
     if (spec.readOnly) return;
     let next = input.value;
     if (spec.type === 'boolean') next = input.checked;
@@ -219,6 +232,13 @@ function createField(spec, { value, onChange, separate = false } = {}) {
     else if (spec.type === 'number') { if (next === '' || !Number.isFinite(Number(next))) { input.setCustomValidity('请输入有效数字'); updateSaveState(); return; } input.setCustomValidity(''); next = Number(next); }
     else if (spec.type === 'array') next = next.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
     else if (spec.nullable && next === '') next = null;
+    if (spec.confirmDisable && next === false && read(spec.path) === true) {
+      // Keep the accepted value in both the form and configuration until confirmation.
+      input.checked = true;
+      const confirmed = await confirmAction('关闭 Shadowsocks TLS？', '请先确认：\n1. 项目部署在 Workers，不能使用 Pages。\n2. 自定义域名关闭「始终使用 HTTPS」等 HTTPS 重定向，或使用项目分配的 workers.dev 域名。\n3. 优选地址使用 HTTP 端口，例如 80、8080、8880、2052、2082、2086、2095。\n\n关闭后不再有 TLS 包装，Shadowsocks AEAD 加密仍然保留。确认后还需保存主配置。', '确认关闭 TLS', true);
+      if (!confirmed || !input.isConnected) return;
+      input.checked = false;
+    }
     if (onChange) onChange(next);
     else { write(spec.path, next); markChanged(); }
   });
@@ -282,7 +302,10 @@ function renderSubscriptionLinks() {
     const button = el('button', 'button', '复制'); button.type = 'button'; button.disabled = !value;
     button.setAttribute('aria-label', '复制' + label);
     button.addEventListener('click', () => copy(value));
-    row.append(field, button); container.append(row);
+    const actions = el('div', 'link-actions');
+    const qr = el('button', 'button', '二维码'); qr.type = 'button'; qr.disabled = !value; qr.setAttribute('aria-label', '显示' + label + '二维码');
+    qr.addEventListener('click', () => window.BrclioTools?.showQR(label, value));
+    actions.append(qr, button); row.append(field, actions); container.append(row);
   });
   $('download-subscription').disabled = !subscriptionURL();
 }
@@ -431,6 +454,7 @@ async function loadWorkspace({ preserveSeparate = false } = {}) {
     $('loading-panel').hidden = true; $('app-content').hidden = false;
     $('last-refreshed').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
     updateSaveState();
+    window.dispatchEvent(new CustomEvent('brclio:config'));
     if (!preserveSeparate) await Promise.allSettled([loadAddresses(), loadLogs()]);
     return true;
   } catch (error) {
@@ -488,6 +512,7 @@ function navigate(page, { hash = true } = {}) {
   $('breadcrumb-current').textContent = pageNames[page]; document.title = pageNames[page] + ' · Brclio Edge';
   if (hash && location.hash !== '#' + page) history.replaceState(null, '', '#' + page);
   closeSidebar(); window.scrollTo({ top: 0 });
+  document.dispatchEvent(new CustomEvent('brclio:navigate', { detail: page }));
   if (page === 'logs' && state.config && !state.logsLoaded) loadLogs();
 }
 
@@ -556,5 +581,22 @@ $('reset-config').addEventListener('click', async () => {
   finally { button.disabled = false; button.textContent = '重置配置'; }
 });
 
+function appendAddresses(lines) {
+  if (!state.addressesLoaded) { toast('请先成功读取自定义地址列表，再追加内容。', true); return false; }
+  const values = (Array.isArray(lines) ? lines : String(lines).split('\n')).map((line) => String(line).trim()).filter(Boolean);
+  if (!values.length) { toast('没有可追加的地址。', true); return false; }
+  const existing = $('custom-addresses').value.trim();
+  $('custom-addresses').value = (existing ? existing + '\n' : '') + values.join('\n');
+  write(['优选订阅生成', 'local'], true); write(['优选订阅生成', '本地IP库', '随机IP'], false);
+  renderFields(); markChanged(); navigate('subscriptions');
+  toast('已追加 ' + values.length + ' 行。请保存地址列表，并保存主配置中的本地来源设置。');
+  return true;
+}
+window.BrclioUI = {
+  appendAddresses, navigate, toast, getConfig: () => state.config, getMeta: () => state.meta, read, write, api, copy, confirmAction,
+  markChanged, renderFields, renderOverview, downloadFile,
+  setField: (path, value) => { write(path, value); renderFields(); markChanged(); },
+  setUsage: (usage) => { state.config.CF ||= {}; state.config.CF.Usage = usage; const baseline = JSON.parse(state.baseline); baseline.CF ||= {}; baseline.CF.Usage = clone(usage); state.baseline = JSON.stringify(baseline); renderOverview(); updateSaveState(); },
+};
 navigate(location.hash.slice(1), { hash: false });
 loadWorkspace();

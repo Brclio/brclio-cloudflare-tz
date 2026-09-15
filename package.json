@@ -11,7 +11,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "npm run build && wrangler dev --local --port 8787",
-    "check": "node --check src/worker.js && node --check src/panel.js && node --check public/assets/app.js && node --check public/assets/login.js",
+    "check": "node scripts/check.mjs",
     "pretest": "npm run build",
     "test": "node --test tests/*.test.mjs",
     "deploy": "npm run build && wrangler deploy",
@@ -21,6 +21,7 @@
     "esbuild": "0.28.2",
     "fflate": "0.8.3",
     "miniflare": "5.20260911.1-alpha",
+    "qrcode-generator": "2.0.4",
     "wrangler": "4.131.2"
   }
 }

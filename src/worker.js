@@ -7,6 +7,9 @@
  * See LICENSE and THIRD_PARTY_NOTICES.md.
  */
 import { connect } from 'cloudflare:sockets';
+import { decodeHunk } from './grpc.js';
+import { handleAdminTool } from './admin-tools.js';
+import { deploymentDownload } from './downloads.js';
 import { localAsset, json, redirect, authenticated, login, logout, sameOrigin, saveCredentials, validateConfig, mergeConfig, safeLogURL, panelHeaders } from './panel.js';
 const Version = '2026-09-04 16:24:13';
 let 缓存SOCKS5白名单 = null, 调试日志打印 = false;
@@ -108,6 +111,27 @@ const worker = {
                     if (!await authenticated(request, env, 管理员密码, 加密秘钥)) return 访问路径 === 'admin' ? redirect('/login') : json({ error: '登录已过期，请重新登录' }, 401);
                     if (request.method !== 'GET' && request.method !== 'POST') return json({ error: '不支持的请求方法' }, 405, { Allow: 'GET, POST' });
                     if (request.method === 'POST' && !sameOrigin(request)) return json({ error: '请求来源不匹配' }, 403);
+                    const toolResponse = await handleAdminTool(request, env, 区分大小写访问路径);
+                    if (toolResponse) return toolResponse;
+                    if (request.method === 'GET') {
+                        const download = deploymentDownload(访问路径);
+                        if (download) return download;
+                        if (访问路径 === 'admin/network') return json({ ip: 访问IP, country: request.cf?.country || '', city: request.cf?.city || '', colo: request.cf?.colo || '', asn: request.cf?.asn || null });
+                    }
+                    if (request.method === 'POST' && ['admin/check', 'admin/getaddapi'].includes(访问路径)) {
+                        let input;
+                        try { const text = await request.text(); if (text.length > 16384) throw Error(); input = JSON.parse(text); } catch { return json({ error: '无效的检测参数' }, 400); }
+                        if (!input || typeof input !== 'object' || Array.isArray(input)) return json({ error: '无效的检测参数' }, 400);
+                        url.search = '';
+                        if (访问路径 === 'admin/check') {
+                            if (!['socks5','http','https','turn','sstp'].includes(input.type) || typeof input.address !== 'string' || !input.address.trim() || input.address.length > 4096) return json({ error: '请填写支持的代理类型与地址' }, 400);
+                            url.searchParams.set(input.type, input.address);
+                        } else {
+                            if (typeof input.url !== 'string' || !/^https?:\/\//i.test(input.url)) return json({ error: '请填写 HTTP(S) 优选 API 地址' }, 400);
+                            url.searchParams.set('url', input.url);
+                            if (input.port) url.searchParams.set('port', String(input.port));
+                        }
+                    }
                     if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.0', upstreamVersion: Version, kv: true });
                     if (request.method === 'POST' && ['admin/cf.json', 'admin/tg.json'].includes(访问路径)) return saveCredentials(request, env, 访问路径 === 'admin/cf.json' ? 'cf' : 'tg');
                     if (访问路径 === 'admin/init' && request.method !== 'POST') return json({ error: '重置配置需要 POST' }, 405, { Allow: 'POST' });
@@ -422,7 +446,7 @@ const worker = {
 								}
 							}).filter(item => item !== null).join('\n');
 						} else { // 订阅转换
-							const 订阅转换URL = `${config_JSON.订阅转换配置.SUBAPI}/sub?target=${订阅类型}&url=${encodeURIComponent(url.protocol + '//' + url.host + '/sub?target=mixed&token=' + 今日订阅转换后端专属TOKEN + '&cnIspCode=' + 识别运营商(request) + (url.searchParams.has('sub') && url.searchParams.get('sub') != '' ? `&sub=${url.searchParams.get('sub')}` : ''))}&config=${encodeURIComponent(config_JSON.订阅转换配置.SUBCONFIG)}&emoji=${config_JSON.订阅转换配置.SUBEMOJI}&list=${config_JSON.订阅转换配置.SUBLIST}&scv=${config_JSON.跳过证书验证}&xudp=${config_JSON.订阅转换配置.XUDP}&udp=${config_JSON.订阅转换配置.UDP}&tls13=${config_JSON.订阅转换配置.TLS13}&append_type=${config_JSON.订阅转换配置.APPEND_TYPE}&sort=${config_JSON.订阅转换配置.SORT}`;
+							const 订阅转换URL = `${config_JSON.订阅转换配置.SUBAPI}/sub?target=${订阅类型}&url=${encodeURIComponent(url.protocol + '//' + url.host + '/sub?target=mixed&token=' + 今日订阅转换后端专属TOKEN + '&cnIspCode=' + 识别运营商(request) + (url.searchParams.has('sub') && url.searchParams.get('sub') != '' ? `&sub=${url.searchParams.get('sub')}` : ''))}&config=${encodeURIComponent(config_JSON.订阅转换配置.SUBCONFIG)}&emoji=${config_JSON.订阅转换配置.SUBEMOJI}&list=${config_JSON.订阅转换配置.SUBLIST}&scv=${config_JSON.跳过证书验证}&xudp=${config_JSON.订阅转换配置.XUDP}&udp=${config_JSON.订阅转换配置.UDP}&tls13=${config_JSON.订阅转换配置.TLS13}&append_type=${config_JSON.订阅转换配置.APPEND_TYPE}&sort=${config_JSON.订阅转换配置.SORT}&expand=${Boolean(config_JSON.订阅转换配置.EXPAND)}`;
 							try {
 								const response = await fetch(订阅转换URL, { headers: { 'User-Agent': 'Subconverter for ' + 订阅类型 + ' edge' + 'tunnel (https://github.com/' + 特征码字典[1] + '/edge' + 'tunnel)' } });
 								if (response.ok) {
@@ -1111,28 +1135,14 @@ async function 处理gRPC请求(request, yourUUID, 反代上下文 = {}) {
 					merged.set(当前块, pending.length);
 					pending = merged;
 					while (pending.byteLength >= 5) {
-						const grpcLen = ((pending[1] << 24) >>> 0) | (pending[2] << 16) | (pending[3] << 8) | pending[4];
+						const grpcLen = new DataView(pending.buffer, pending.byteOffset, pending.byteLength).getUint32(1);
+						if (pending[0] !== 0 || grpcLen > 4 * 1024 * 1024) throw new Error('Unsupported or oversized gRPC frame');
 						const frameSize = 5 + grpcLen;
 						if (pending.byteLength < frameSize) break;
 						const grpcPayload = pending.subarray(5, frameSize);
 						pending = pending.slice(frameSize);
 						if (!grpcPayload.byteLength) continue;
-						let payload = grpcPayload;
-						if (payload.byteLength >= 2 && payload[0] === 0x0a) {
-							let shift = 0;
-							let offset = 1;
-							let varint有效 = false;
-							while (offset < payload.length) {
-								const current = payload[offset++];
-								if ((current & 0x80) === 0) {
-									varint有效 = true;
-									break;
-								}
-								shift += 7;
-								if (shift > 35) break;
-							}
-							if (varint有效) payload = payload.subarray(offset);
-						}
+						const payload = decodeHunk(grpcPayload);
 						if (!payload.byteLength) continue;
 						if (isDnsQuery) {
 							if (判断是否是木马) await 转发木马UDP数据(payload, grpcBridge, 木马UDP上下文, request);
@@ -5608,6 +5618,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 			SUBCONFIG: `https://raw.githubusercontent.com/${特征码字典[1]}/ACL4SSR/refs/heads/main/Clash/config/ACL4SSR_Online_Mini_MultiMode_CF.ini`,
 			SUBEMOJI: false,
 			SUBLIST: false, //仅输出节点信息
+            EXPAND: false, //展开规则集
 			UDP: false, // 启用 UDP
 			XUDP: false, // 启用 XUDP
 			TLS13: false, // 启用 TLS 1.3
@@ -5681,6 +5692,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 	}
 
 	if (!config_JSON.订阅转换配置.SUBLIST) config_JSON.订阅转换配置.SUBLIST = false;
+    if (config_JSON.订阅转换配置.EXPAND === undefined) config_JSON.订阅转换配置.EXPAND = false;
 	if (!config_JSON.订阅转换配置.UDP) config_JSON.订阅转换配置.UDP = false;
 	if (!config_JSON.订阅转换配置.XUDP) config_JSON.订阅转换配置.XUDP = false;
 	if (!config_JSON.订阅转换配置.TLS13) config_JSON.订阅转换配置.TLS13 = false;

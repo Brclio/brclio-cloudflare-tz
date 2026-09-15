@@ -1,6 +1,6 @@
 # 管理 API：上游兼容契约
 
-基线：[cmliu/edgetunnel @ 448a83c](https://github.com/cmliu/edgetunnel/blob/448a83ced00a43c1d892d5ecbed86a26ea9eeaff/_worker.js)。第 1–8 节记录上游实际行为，供本地管理界面及适配层维护。**本仓库当前接口以第 9 节“Brclio 本地版本差异”为准**，其中列出鉴权、保存校验和用量读取的已实现改动。
+基线：[cmliu/edgetunnel @ 448a83c](https://github.com/cmliu/edgetunnel/blob/448a83ced00a43c1d892d5ecbed86a26ea9eeaff/_worker.js)。第 1–8 节记录上游实际行为，供本地管理界面及适配层维护。**本仓库当前接口以第 9 节“Brclio 本地版本差异”和第 10 节“本地管理工具接口”为准**，其中列出鉴权、保存校验和用量读取的已实现改动。
 
 ## 1. 通用规则
 
@@ -389,3 +389,120 @@ GET  /admin/getCloudflareUsage  ← 读取 KV 中已保存的凭证查询
 | `tests/usage-api.test.mjs` | 用受控出站 HTTP fixture 检验存储凭证、URL 拒绝、响应类型校验、null 不破坏订阅、4 秒超时 |
 
 协议测试不依赖任何公共代理。用量测试使用受控 HTTP 响应，不使用真实 Cloudflare 账户密钥，也不宣称生产账户查询已验证。执行结果应以当次 `npm test` 输出为准。
+## 10. 本地管理工具接口（2026-09-15）
+
+本节描述新增的本地工具和兼容入口，区别于前文的固定上游 API。入口由 `src/worker.js` 鉴权，再调用 `src/admin-tools.js`；工具路径保留大小写，例如 `/admin/testSubAPI`。新增接口不会在模块加载时主动出站；由管理页的明确操作调用。
+
+### 10.1 共同约定
+
+- 所有 `/admin/*` 工具要求有效会话；未登录返回 HTTP 401 JSON。写入和检测 POST 还要求同源请求，来源不符返回 HTTP 403。
+- 工具 POST 使用 `Content-Type: application/json`。`admin-tools.js` 的 JSON 对象上限为 8 KiB；不接受数组、null 或畸形 JSON。
+- 一般成功响应包含 `success:true`；失败为 `{success:false,error:"用户可读说明"}`。参数错误通常为 400、错误方法为 405、远端 HTTP / 格式失败为 502、远端超时为 504。旧兼容接口的错误形状见各小节。
+- 工具响应设置 `Cache-Control: no-store`；出站请求不转发浏览器 Cookie / Authorization。远端错误文本不会直接成为 Telegram 错误提示。
+- 常规工具请求在 6 秒后超时；一般响应大小上限为 2 MiB。ProxyIP 大目录单独允许 15 秒和 20 MiB。单次 Telegram 检测包含两次顺序请求，因此整段最长约 12 秒。
+- 新接口失败不自动切换第三方服务，也不启动重试循环。外部目录和服务仍可能因为源更新、可用性或 Cloudflare 网络条件失败。
+
+### 10.2 GET /admin/catalog?kind=…
+
+从固定来源读取目录；`kind` 必须为以下之一，不能通过 `url` 参数改写来源。响应保持第三方目录的原始 JSON 结构。
+
+| kind | 固定来源 | `data` 结构 |
+| --- | --- | --- |
+| `subapi` | `https://raw.githubusercontent.com/cmliu/cmliu/main/SUBAPI.json` | `[{label,value}]` |
+| `subconfig` | `https://raw.githubusercontent.com/cmliu/cmliu/main/SUBCONFIG.json` | `[{label,options:[{label,value}]}]` |
+| `paths` | `https://raw.githubusercontent.com/cmliu/cmliu/main/json/edt-path-config.json` | `[{项目名,提示消息,路径模板:{…}}]` |
+| `localtools` | `https://raw.githubusercontent.com/cmliu/cmliu/refs/heads/main/json/best-cf-tools.json` | `{projects:[{name,author,description,platforms:[],ui:[],stars,github,…}]}` |
+| `socks5` | `https://raw.githubusercontent.com/EDT-Pages/Proxy-List/main/data/socks5.json` | 代理对象数组 |
+| `http` | 同一目录的 `http.json` | 代理对象数组 |
+| `https` | 同一目录的 `https.json` | 代理对象数组 |
+| `proxyip` | `https://zip.cm.edu.kg.cmliussss.net/all.json` | `{generated_at,list,data:[{ip,port:[…],meta:{…}}]}` |
+| `version` | `https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js` | `{version:"2026-09-04 16:24:13"}`；仅提取源码 `const Version`，不返回上游源码 |
+
+成功示例：
+
+```json
+{"success":true,"kind":"subapi","source":"https://raw.githubusercontent.com/cmliu/cmliu/main/SUBAPI.json","data":[{"label":"示例","value":"https://converter.example"}]}
+```
+
+公共代理对象通常含 `proxy`（可能包括公开代理账号）、`protocol`、`ip`、数值 `port`、`country`、`city`、`asn`、`asOrganization`、`latitude` 和 `longitude`。经纬度可为数字或字符串，调用方需要归一化；它们不是当前用户保存的凭据。ProxyIP 的 `port` 是端口数组，地区信息在 `meta` 内，不能按普通代理数组直接读取。
+
+`localtools` 是第三方工具介绍目录，`ui` 可含 `webui`、`gui`、`cli`。页面只在点击“加载”时请求，随后在本地筛选并打开项目链接；该接口不会安装、执行工具或启动测速。目录仍适用一般 6 秒 / 2 MiB 限制。
+
+### 10.3 POST /admin/testSubAPI
+
+请求：`{"url":"https://converter.example"}`。
+
+- URL 最长 2,048 字符；接受 HTTP / HTTPS，未给协议默认 HTTPS；拒绝 URL 用户名和密码。
+- 测试使用规范化 origin 的 `/version`，例如输入 `https://converter.example/sub?target=clash` 时测试 `https://converter.example/version`。
+- 响应必须包含 `subconverter`（忽略大小写）；版本响应上限 8 KiB。
+- 成功返回 `{"success":true,"url":"https://converter.example","version":"subconverter v0.9.0"}`。页面应使用返回的 `url` 作为转换后端保存值，不能把完整 `/sub?...` 再拼接 `/sub`。
+- 该接口只验证，不写 `config.json`。应用字段后仍需保存主配置。
+
+### 10.4 POST /admin/testTelegram
+
+请求必须为 `{"sendMessage":true}`；没有该明确字段返回 400，不发送消息。
+
+服务端从 `KV/tg.json` 读取已保存的 `BotToken` 和 `ChatID`，忽略请求体中另传的凭据。先向官方 `https://api.telegram.org/bot<TOKEN>/getMe` 发起 POST，确认有效机器人后再向 `sendMessage` POST 一条 Brclio 配置验证消息。请求体中的 `chat_id` 取保存值。
+
+成功：`{"success":true,"sent":true,"username":"example_bot","message":"Telegram 测试消息已发送"}`，`username` 可省略。结果不返回 Bot Token、Chat ID、完整 Telegram 响应或远端错误描述。机器人验证失败时不发送消息。
+
+该操作不会设置 `TG.启用`；启用后续日志通知仍需单独修改并保存主配置。测试使用受控本地 HTTP fixtures，不代表已向真实聊天投递。
+
+### 10.5 POST /admin/check
+
+请求：`{"type":"proxyip","address":"[2001:db8::1]:443"}`。
+
+| type | 行为 | 限制 / 响应 |
+| --- | --- | --- |
+| `proxyip` | 固定调用 `https://api.090227.xyz/check?proxyip=<编码地址>` | 地址最长 512 字符，无账号、空白或路径；响应上限 64 KiB / 6 秒 |
+| `socks5` / `http` / `https` / `turn` / `sstp` | 主 Worker 归一 JSON 参数，再进入原版 TCP / TLS 检查函数 | `address` 为非空字符串，最长 4,096 字符；原检查返回形状保留 |
+
+ProxyIP 成功示例：
+
+```json
+{"success":true,"ip":"192.0.2.1","loc":"US","responseTime":124,"supports_ipv4":true,"supports_ipv6":true}
+```
+
+`ip`、`loc`、`responseTime` 只在来源提供相应有效值时返回；不能把缺失字段解释为已确认。失败可为 HTTP 200 + `success:false`，管理页必须同时检查业务状态。原版 GET `/admin/check?socks5=…` 等继续兼容，新页面使用 POST，避免账号密码进入浏览器 URL。
+
+### 10.6 POST /admin/ipDetail
+
+请求：`{"ip":"192.0.2.1"}` 或 IPv6 字面量，最长 45 字符。域名、URL、端口、CIDR 和无效 IP 返回 400。
+
+固定请求 `https://api.ipapi.is/?q=<IP>`，6 秒超时、1 MiB 响应上限；成功为：
+
+```json
+{"success":true,"source":"https://api.ipapi.is/","data":{"ip":"192.0.2.1","location":{"country_code":"US"},"is_proxy":false}}
+```
+
+`data` 保留来源提供的 JSON，供页面显示地区、ASN、公司类型、标识及地理位置。信息是第三方数据库的判断，不代表本项目自行测得风险、身份或精确位置；没有备用来源自动切换。
+
+### 10.7 POST /admin/getADDAPI
+
+新增 POST 与原 GET 共享解析逻辑：`{"url":"https://addresses.example/list?port=8443&proxyip=true","port":8443}`。
+
+- JSON 对象读取上限 16 KiB；`url` 要求 HTTP(S)。来源 URL 自己的 `port` / `proxyip` 参数仍按上游解析语义处理；外层 `port` 是默认端口。
+- 成功形状仍为 `{"success":true,"data":["192.0.2.1:8443#示例"]}`。结果可能为空，页面应明确提示“未返回可用地址”。
+- 接口只验证来源并返回结果，不追加或保存 `ADD.txt`。追加动态来源 URL 与追加静态结果由页面两个独立按钮完成。
+- 新页面只在明确点击验证时请求；原 GET 兼容入口仍存在。
+
+### 10.8 GET /admin/network
+
+返回当前已认证请求的边缘元数据：`{ip,country,city,colo,asn}`，不带 `success` 包装。`asn` 未提供时为 null，地区字段未提供时为空串。
+
+该结果描述浏览器访问**当前 Worker**时的入口，不是任意其他 Cloudflare 网站的出口，也不是本地运行中模拟 `request.cf` 的真实地理证明。页面只在点击网络信息查询后读取。
+
+### 10.9 当前部署源码与 Pages ZIP
+
+- `GET /admin/download/worker.js`：返回可独立部署的当前 Brclio Worker ESM 源码，`Content-Type: text/javascript`，附件名 `_worker.js`。
+- `GET /admin/download/pages.zip`：返回由当前源码构建的 Pages ZIP，含 `_worker.js`、`_routes.json`、入口提示 HTML 以及许可证和第三方声明，`Content-Type: application/zip`。
+- 这两个接口需要会话，不拉取另一个版本的上游源码；使用构建时源模板重建部署程序，不把运行时 `ADMIN`、KV、Bot Token 或 Cloudflare 密钥写入下载文件。
+- 下载本身不升级或部署。安装到 Cloudflare 后仍需绑定 KV、配置环境变量、重新部署并进行客户端验收。
+
+### 10.10 EXPAND 与手动检测边界
+
+`订阅转换配置.EXPAND` 已成为布尔字段，默认 false；生成转换 URL 时带 `expand=true|false`。固定上游 Worker 未包含它，但审计到的远端管理页已有此选项，本地补全了实际参数传递。
+
+用户要求的测速改变是：打开页面、展开工具、切换页面、选择地区或修改输入不启动检测；点击明确按钮后仅执行有限任务。停止、离页及页面隐藏终止测速；结果完成后不保留重复出站的循环。UTC 配额倒计时仅更新本地文字。
+
+此前安全改动继续保留：24 小时签名会话、退出撤销、同源 POST、重置不接受 GET、凭据从 KV 读取、日志 URL 脱敏、配置对象校验和空 ADD 的真实持久化视图。它们属于接口安全边界，不应被“功能对齐”描述掩盖。
