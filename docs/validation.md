@@ -119,3 +119,14 @@
 - 未使用真实凭据验证 Cloudflare 用量或 Telegram 通知投递，也未做实际手机硬件与 Safari / Firefox 验证。
 
 上线验收应按 [README](../README.md) 完成绑定、重新部署、订阅更新和客户端连接；后台页面正常加载本身不是公网连通证明。
+
+## v1.0.0 发布前复核 — 2026-09-16
+
+- Node.js 22.23.2，干净执行 `npm ci`，锁定依赖报告 0 个已知漏洞。
+- `npm run check` 与完整 `npm test` 通过：**119 项，0 失败，0 跳过**。新增两项检查验证发行 ZIP 的准确文件清单与 Worker 随附许可的逐字一致性。
+- 补齐 fflate 0.8.3 的 MIT 许可：独立 Worker 含 16 个本地资源，Pages ZIP 根目录 8 个文件，包括 fflate、二维码与字体许可。
+- `wrangler deploy --dry-run` 通过，gzip 约 **614.31 KiB**；未上传 Cloudflare。
+- 独立教程使用现成版本下载作为主流程，源码构建保留为可选；浏览器内本地生成 UUID，无需安装 Node.js。教程 **50 项浏览器检查通过**，含离线、320–1920px 布局、复制、UUID、原图与打印状态，见 [教程验证](tutorial-validation.md)。
+- 发布时只取明确的 Worker、Pages ZIP、教程和构建清单，另生成源码提交与 SHA-256 清单；不打包 `dist/dry-run`、本地变量或 KV 数据。Release 附件的校验信息见版本内 `release-manifest.json` 与 `SHA256SUMS.txt`。
+
+本段验证适用于发布版本；前面的 117 项及原始浏览器记录保留为 2026-09-15 的初次验收事实。

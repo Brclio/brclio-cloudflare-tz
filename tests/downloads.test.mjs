@@ -44,6 +44,7 @@ before(async () => {
     ['THIRD_PARTY_NOTICES.txt', '../THIRD_PARTY_NOTICES.md'],
     ['NotoSerifSC-OFL.txt', '../licenses/NotoSerifSC-OFL.txt'],
     ['qrcode-generator-MIT.txt', '../licenses/qrcode-generator-MIT.txt'],
+    ['fflate-MIT.txt', '../licenses/fflate-MIT.txt'],
   ].map(async ([name, path]) => [name, await readFile(new URL(path, import.meta.url))])));
   mf = instance(builtSource);
   await mf.ready;
@@ -128,6 +129,24 @@ test('authenticated Worker download is byte-for-byte the built standalone progra
 test('authenticated Pages ZIP unpacks to the identical standalone Worker and complete license files', async () => {
   const cookie = await signIn();
   unpackPages(await download(mf, endpoints[1], cookie));
+});
+
+test('the release Pages ZIP contains only deployment files and complete matching licenses', async () => {
+  const files = unpackPages(await readFile(new URL('../dist/brclio-edge-pages.zip', import.meta.url)));
+  assert.deepEqual(Object.keys(files).sort(), [
+    '_worker.js', '_routes.json', 'index.html', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt',
+    'NotoSerifSC-OFL.txt', 'qrcode-generator-MIT.txt', 'fflate-MIT.txt',
+  ].sort());
+});
+
+test('the standalone Worker serves every bundled license byte-for-byte', async () => {
+  for (const [name, expected] of Object.entries(licenseFiles)) {
+    const assetName = name === 'THIRD_PARTY_NOTICES.txt' ? 'THIRD_PARTY_NOTICES.md' : name;
+    const response = await request(mf, '/assets/licenses/' + assetName);
+    assert.equal(response.status, 200, assetName);
+    assertExact(await response.arrayBuffer(), expected, `Worker license ${assetName}`);
+  }
+  assertExact(licenseFiles['fflate-MIT.txt'], await readFile(new URL('../node_modules/fflate/LICENSE', import.meta.url)), 'Locked fflate package license');
 });
 
 test('downloaded programs restart in real workerd and reproduce the same source and Pages package', { timeout: 30000 }, async t => {

@@ -22,7 +22,7 @@ await collect(path.join(root, 'public'));
 for (const required of ['/admin.html', '/login.html', '/setup.html', '/assets/app.css', '/assets/app.js', '/assets/login.js', '/assets/brand.svg']) {
   if (!assets[required]) throw new Error(`Missing required panel asset: ${required}`);
 }
-for (const name of ['LICENSE', 'licenses/NotoSerifSC-OFL.txt', 'licenses/qrcode-generator-MIT.txt', 'THIRD_PARTY_NOTICES.md']) {
+for (const name of ['LICENSE', 'licenses/NotoSerifSC-OFL.txt', 'licenses/qrcode-generator-MIT.txt', 'licenses/fflate-MIT.txt', 'THIRD_PARTY_NOTICES.md']) {
   assets['/assets/licenses/' + path.basename(name)] = { type: 'text/plain; charset=utf-8', data: (await readFile(path.join(root, name))).toString('base64') };
 }
 await mkdir(path.join(root, 'dist/pages'), { recursive: true });
@@ -52,8 +52,9 @@ await copyFile(path.join(root, 'LICENSE'), path.join(root, 'dist/pages/LICENSE.t
 await copyFile(path.join(root, 'THIRD_PARTY_NOTICES.md'), path.join(root, 'dist/pages/THIRD_PARTY_NOTICES.txt'));
 await copyFile(path.join(root, 'licenses/NotoSerifSC-OFL.txt'), path.join(root, 'dist/pages/NotoSerifSC-OFL.txt'));
 await copyFile(path.join(root, 'licenses/qrcode-generator-MIT.txt'), path.join(root, 'dist/pages/qrcode-generator-MIT.txt'));
+await copyFile(path.join(root, 'licenses/fflate-MIT.txt'), path.join(root, 'dist/pages/fflate-MIT.txt'));
 const zipFiles = {};
-for (const name of ['_worker.js', 'index.html', '_routes.json', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt', 'NotoSerifSC-OFL.txt', 'qrcode-generator-MIT.txt']) {
+for (const name of ['_worker.js', 'index.html', '_routes.json', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.txt', 'NotoSerifSC-OFL.txt', 'qrcode-generator-MIT.txt', 'fflate-MIT.txt']) {
   zipFiles[name] = [new Uint8Array(await readFile(path.join(root, 'dist/pages', name))), { mtime: new Date('2026-09-15T00:00:00Z') }];
 }
 await writeFile(path.join(root, 'dist/brclio-edge-pages.zip'), zipSync(zipFiles, { level: 9 }));

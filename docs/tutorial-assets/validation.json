@@ -1,0 +1,334 @@
+{
+  "date": "2026-09-16",
+  "environment": "Chromium via Playwright CLI; local HTTP and file://; no production deployment",
+  "browserChecks": {
+    "passed": true,
+    "total": 42,
+    "failures": [],
+    "checks": [
+      {
+        "name": "script initialized",
+        "passed": true
+      },
+      {
+        "name": "no horizontal overflow 1920px",
+        "passed": true,
+        "detail": {
+          "width": 1920,
+          "content": 1920
+        }
+      },
+      {
+        "name": "no horizontal overflow 1440px",
+        "passed": true,
+        "detail": {
+          "width": 1440,
+          "content": 1440
+        }
+      },
+      {
+        "name": "no horizontal overflow 1024px",
+        "passed": true,
+        "detail": {
+          "width": 1024,
+          "content": 1024
+        }
+      },
+      {
+        "name": "no horizontal overflow 900px",
+        "passed": true,
+        "detail": {
+          "width": 900,
+          "content": 900
+        }
+      },
+      {
+        "name": "no horizontal overflow 768px",
+        "passed": true,
+        "detail": {
+          "width": 768,
+          "content": 768
+        }
+      },
+      {
+        "name": "no horizontal overflow 390px",
+        "passed": true,
+        "detail": {
+          "width": 390,
+          "content": 390
+        }
+      },
+      {
+        "name": "no horizontal overflow 375px",
+        "passed": true,
+        "detail": {
+          "width": 375,
+          "content": 375
+        }
+      },
+      {
+        "name": "no horizontal overflow 320px",
+        "passed": true,
+        "detail": {
+          "width": 320,
+          "content": 320
+        }
+      },
+      {
+        "name": "progress records two steps",
+        "passed": true
+      },
+      {
+        "name": "progress persists after reload",
+        "passed": true
+      },
+      {
+        "name": "progress resets",
+        "passed": true
+      },
+      {
+        "name": "copy preserves actual command newlines",
+        "passed": true
+      },
+      {
+        "name": "UUID copy initially disabled",
+        "passed": true
+      },
+      {
+        "name": "local UUID is valid v4",
+        "passed": true
+      },
+      {
+        "name": "each UUID click generates fresh identity",
+        "passed": true
+      },
+      {
+        "name": "generated UUID copies exactly",
+        "passed": true
+      },
+      {
+        "name": "generated UUID is not stored",
+        "passed": true
+      },
+      {
+        "name": "UUID is cleared on reload",
+        "passed": true
+      },
+      {
+        "name": "Pages download points to release asset",
+        "passed": true
+      },
+      {
+        "name": "FAQ search filters matching text",
+        "passed": true,
+        "detail": 1
+      },
+      {
+        "name": "FAQ search has empty state",
+        "passed": true
+      },
+      {
+        "name": "FAQ reset restores every item",
+        "passed": true
+      },
+      {
+        "name": "current chapter follows anchor navigation",
+        "passed": true
+      },
+      {
+        "name": "original viewer opens",
+        "passed": true
+      },
+      {
+        "name": "100% mode is original 1920x1200",
+        "passed": true,
+        "detail": {
+          "width": 1920,
+          "height": 1200,
+          "naturalWidth": 1920,
+          "naturalHeight": 1200
+        }
+      },
+      {
+        "name": "original PNG downloads",
+        "passed": true
+      },
+      {
+        "name": "fit mode fits inside viewport",
+        "passed": true,
+        "detail": {
+          "width": 1350,
+          "height": 843.75
+        }
+      },
+      {
+        "name": "Escape closes viewer and restores focus",
+        "passed": true
+      },
+      {
+        "name": "mobile table of contents opens",
+        "passed": true
+      },
+      {
+        "name": "mobile menu traps keyboard focus",
+        "passed": true
+      },
+      {
+        "name": "mobile menu wraps keyboard focus",
+        "passed": true
+      },
+      {
+        "name": "mobile navigation closes after selection",
+        "passed": true
+      },
+      {
+        "name": "mobile Escape closes menu",
+        "passed": true
+      },
+      {
+        "name": "all 9 original figures decode",
+        "passed": true
+      },
+      {
+        "name": "all original dimensions retained",
+        "passed": true,
+        "detail": [
+          {
+            "name": "login",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "overview",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "nodes",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "subscriptions",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "manual-speedtest",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "routing",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "settings-backup",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "settings-download",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "settings",
+            "width": 1920,
+            "height": 1200
+          }
+        ]
+      },
+      {
+        "name": "no external HTTP requests",
+        "passed": true,
+        "detail": []
+      },
+      {
+        "name": "standalone file opens without server",
+        "passed": true
+      },
+      {
+        "name": "standalone script works",
+        "passed": true
+      },
+      {
+        "name": "standalone embedded font loads",
+        "passed": true
+      },
+      {
+        "name": "no-JS chapter content remains readable",
+        "passed": true
+      },
+      {
+        "name": "no JavaScript runtime errors",
+        "passed": true,
+        "detail": []
+      }
+    ]
+  },
+  "downloadHashVerified": true,
+  "finalArtifactChecks": {
+    "passed": true,
+    "total": 8,
+    "checks": [
+      {
+        "name": "final file works fully offline",
+        "passed": true
+      },
+      {
+        "name": "all images decode with network offline",
+        "passed": true
+      },
+      {
+        "name": "320px expanded chapters stay within viewport",
+        "passed": true,
+        "detail": {
+          "contentWidth": 320
+        }
+      },
+      {
+        "name": "printing expands every details section",
+        "passed": true
+      },
+      {
+        "name": "printing restores original detail state",
+        "passed": true
+      },
+      {
+        "name": "chapter anchor lands below viewport top",
+        "passed": true,
+        "detail": {
+          "top": 39.984375,
+          "navHeight": 540,
+          "navScrollable": true
+        }
+      },
+      {
+        "name": "short desktop navigation remains scrollable",
+        "passed": true,
+        "detail": {
+          "top": 39.984375,
+          "navHeight": 540,
+          "navScrollable": true
+        }
+      },
+      {
+        "name": "final mobile navigation closes correctly",
+        "passed": true
+      }
+    ]
+  },
+  "totalPassingChecks": 50,
+  "finalArtifactSha256": "c916567eeeb8717554fea6376a340d21a4bd3e0d609fe006da6ab35147130406",
+  "staticChecks": {
+    "readmeLocalTargetsValid": true,
+    "internalAnchorsAndAriaReferencesValid": true,
+    "allEmbeddedOriginalBytesMatch": true,
+    "allImages1920x1200": true,
+    "embeddedScriptEqualsSource": true,
+    "noExternalRuntimeResources": true,
+    "fontHeadingsCovered": true
+  }
+}

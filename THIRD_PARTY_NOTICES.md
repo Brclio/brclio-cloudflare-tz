@@ -25,7 +25,13 @@ Copyright (C) 2026 Brclio。新增程序、界面和本仓库自编文档以 GPL
 
 本地中文标题字体 Noto Serif SC 来自 [Google Fonts / Noto Serif SC](https://github.com/google/fonts/tree/main/ofl/notoserifsc)，采用 SIL Open Font License 1.1。仅包含界面所需字符的子集，许可全文见 [licenses/NotoSerifSC-OFL.txt](licenses/NotoSerifSC-OFL.txt)，字符、大小及哈希记录见 [docs/font-provenance.json](docs/font-provenance.json)。字体保留自身 OFL 许可。正文使用系统字体栈，不请求远程字体。
 
+独立教程使用同一官方字体的 700 字重子集，来源提交、字符覆盖与校验记录见 [教程字体来源](docs/tutorial-assets/font-provenance.json)。OFL 全文同时保留在教程 HTML 和字体内。教程中的 9 张管理界面截图由本项目本地运行拍摄，未分发第三方视频截图；原始 PNG 与校验记录位于 [tutorial-assets](docs/tutorial-assets/local-captures.json)。
+
 ## 二维码与手动测速
 
 - 本地二维码使用 Kazuhiko Arase 的 [qrcode-generator 2.0.4](https://github.com/kazuhikoarase/qrcode-generator)，采用 MIT 许可，正文见 [licenses/qrcode-generator-MIT.txt](licenses/qrcode-generator-MIT.txt)。本项目启用其 UTF-8 编码，二维码数据不上传外部服务。
 - 测速及工具界面独立编写；功能对照参考 [EDT-Pages 管理页](https://edt-pages.github.io/admin)。BestCF 探测服务、公开代理目录及网络信息接口属于原版使用的第三方服务，仅在用户点击相应操作后请求；未复制该页面的界面模板、图片、混淆或 Snippets 内核。
+
+## ZIP 打包
+
+构建脚本与管理页部署包下载使用 Arjun Barrett 的 [fflate 0.8.3](https://github.com/101arrowz/fflate)，采用 MIT 许可。其 ZIP 实现会捆绑到独立 Worker 中；完整原始许可见 [licenses/fflate-MIT.txt](licenses/fflate-MIT.txt)，并随 Worker 的本地许可资源及两种 Pages ZIP 一同分发。

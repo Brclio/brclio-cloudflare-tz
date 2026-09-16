@@ -1,581 +1,208 @@
 # Brclio Edge
 
-**一个属于自己的 Cloudflare 边缘连接工作空间。**
+运行于 **Cloudflare Workers / Pages** 的开源隧道管理面板。基于 [cmliu/edgetunnel](https://github.com/cmliu/edgetunnel) 的协议实现，提供独立的 Brclio 管理界面、订阅管理、手动测速与部署工具。
 
-基于 [cmliu/edgetunnel](https://github.com/cmliu/edgetunnel) 的协议实现，重新设计登录页、管理后台与部署指引。使用 Brclio 的暖纸色、蓝色与黄色视觉语言，让节点配置、订阅和日常维护更容易理解。
+管理页面、样式、脚本、字体和二维码组件均在仓库内维护，构建后嵌入独立 Worker。项目以 **GPL-2.0-only** 开源，允许使用、修改、再分发和商业使用。
 
-完整源码采用 **GPL-2.0-only** 开放：允许个人使用、修改、再分发和商业使用；分发衍生程序时请遵守 GPL 的源码与许可证要求。详见 [LICENSE](LICENSE) 和 [第三方来源与署名](THIRD_PARTY_NOTICES.md)。
+[下载 Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) · [完整部署与使用教程](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.0/brclio-edge-tutorial.html) · [功能对照](docs/upstream-feature-matrix.md) · [验证记录](docs/validation.md) · [许可证](LICENSE)
 
-![Brclio Edge 管理概览](docs/images/admin-desktop.png)
+## 快速部署
 
-## 这个项目可以做什么
+从 [GitHub Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) 下载预构建文件即可部署，无需安装 Node.js 或自行构建。下面是 **v1.0.0** 的部署包与教程：
 
-- **管理自己的节点**：配置 VLESS、Trojan、Shadowsocks，以及 WebSocket、gRPC、XHTTP 等传输选项。
-- **统一管理订阅**：复制单节点或订阅链接，按客户端选择输出格式，管理随机或自定义优选地址。
-- **按需测速与优选**：手动查询网络信息、测试网站延迟，从 IPv4 / IPv6、CIDR 或地址区间生成候选，再选择延迟或下载测速。
-- **调整路由与代理**：使用自动 ProxyIP、自定义反代地址或已有的上游代理。
-- **查看配置和日志**：检索访问记录，按需连接 Cloudflare 用量查询与 Telegram 通知。
-- **保留完整配置能力**：表单用于常见设置，原始 JSON 编辑器保留高级字段；支持主配置导入、导出。
-- **独立部署管理界面**：后台 HTML、CSS、JavaScript 与品牌资源都来自本项目，构建时打包进 Worker。
-- **直接获取部署文件**：登录后下载当前版本的完整 Worker 或 Pages ZIP，也可显示节点与订阅二维码。
-
-管理界面不依赖远程托管的管理 HTML 或外部 CDN 脚本。协议运行中的 ProxyIP、订阅转换等可选或上游默认服务仍有各自的外部依赖，见[高级设置](#高级设置)。
-
-### 先理解三个东西
-
-| 名称 | 可以怎样理解 | 在这里的用途 |
-| --- | --- | --- |
-| Cloudflare Pages / Workers | 运行代码的地方 | 接收连接、提供后台和生成订阅 |
-| Workers KV | 保存设置的小仓库 | 保存节点配置、自定义地址及可选服务配置 |
-| 自定义域名 | 你自己的访问入口 | 打开管理后台，作为客户端连接和订阅入口 |
-
-```mermaid
-flowchart LR
-    A[你的客户端] --> B[自己的域名]
-    B --> C[Cloudflare Worker]
-    C --> D[目标服务 / 上游代理]
-    E[Brclio 管理后台] --> C
-    C <--> F[Workers KV 配置]
-```
-
-本文讲的是在 Cloudflare 上运行应用代码。Cloudflare 自身的账号控制台仍由 Cloudflare 提供。
-
-## 文字教程从哪里来
-
-本教程依据零度解说的[指定视频](https://www.youtube.com/watch?v=chcFg878840)整理：**已完整阅读原视频字幕、查看覆盖全片的预览画面，并用 1080p 原视频关键帧核对操作。** 原片发布于 2026-04-02，约 14 分 24 秒。
-
-下面保留原视频的 **Pages 拖放部署** 主线，并把文件名和后台操作替换为本项目实际实现。字幕中 `ADMIN` 的拼写及「自适应订阅」的识别错误已按画面纠正。详细依据见[视频观看与核对记录](docs/video-research.md)。
-
-原视频的测速结果、免费域名权益和网站访问效果属于当时演示。实际费用、配额和可用性由服务商政策、账号及网络环境决定；Cloudflare 免费方案有请求、CPU 与 KV 用量限制。参阅 [Cloudflare 官方限制](https://developers.cloudflare.com/workers/platform/limits/)与[计费说明](https://developers.cloudflare.com/workers/platform/pricing/)。
-
-### 阅读路线
-
-1. [准备账号、域名与部署包](#第一步准备账号域名与部署包)
-2. [将域名接入 Cloudflare](#第二步将域名接入-cloudflare)
-3. [创建 KV 命名空间](#第三步创建-kv-命名空间)
-4. [创建 Pages 并上传](#第四步创建-pages-并上传)
-5. [设置 ADMIN 和 KV](#第五步设置-admin-和-kv)
-6. [绑定域名并重新部署](#第六步绑定域名并重新部署)
-7. [登录自己的管理后台](#第七步登录自己的管理后台)
-8. [生成订阅并导入客户端](#第八步生成订阅并导入客户端)
-9. [按需测速、筛选并保存优选地址](#测速与优选按需运行一轮)
-
----
-
-## 第一步：准备账号、域名与部署包
-
-对应原片：[01:01 域名准备](https://www.youtube.com/watch?v=chcFg878840&t=61s)、[03:25 Cloudflare 账号](https://www.youtube.com/watch?v=chcFg878840&t=205s)、[07:10 获取代码](https://www.youtube.com/watch?v=chcFg878840&t=430s)。
-
-### 1. 准备这些内容
-
-| 准备项 | 说明 |
+| 下载文件 | 用途 |
 | --- | --- |
-| Cloudflare 账号 | 在 [Cloudflare](https://dash.cloudflare.com/) 注册或登录；教程按免费方案的操作入口说明 |
-| 自己能够管理 DNS 的域名 | 推荐使用已经持有的域名或其子域名，无需为本教程另行购买 |
-| 电脑上的 Node.js | 安装 [Node.js](https://nodejs.org/) 22 或以上版本，包含 npm |
-| 本项目源码 | 从当前仓库下载源码 ZIP 并解压，或使用下面的 Git 命令 |
-| 客户端 | 原片演示 [v2rayN](https://github.com/2dust/v2rayN)，使用其他客户端时选择相应订阅格式 |
+| [brclio-edge-pages.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.0/brclio-edge-pages.zip) | 推荐：直接上传到 Cloudflare Pages 的拖放部署入口 |
+| [_worker.js](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.0/_worker.js) | 在 Workers 代码编辑器中替换全部示例代码 |
+| [brclio-edge-tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.0/brclio-edge-tutorial.html) | 下载后双击打开的完整图文教程 |
 
-原片使用 DNSHE 注册域名，演示了 `ccwu.cc`、`us.ci` 等后缀。想跟着原片了解该服务，可从[作者配套资料页](https://www.freedidi.com/23618.html)进入。注册额度、可选后缀、到期和续期条件应以服务商当前页面为准；已有域名的读者可以跳过这段。
+仓库当前为私有，访问 Release 和下载附件需要登录有仓库访问权限的 GitHub 账号。
 
-### 2. 在自己电脑上构建部署包
+创建自己的 Cloudflare 项目后，设置管理员机密 `ADMIN`、固定的 UUID v4 机密 `UUID`，并添加名称为大写 `KV` 的 KV 命名空间绑定；保存后重新部署，再访问 `https://你的域名/admin`。完整步骤见下载的 HTML 教程，配置表与其他部署方式见下方[部署说明](#部署说明)。
 
-如果会使用 Git，在终端依次执行：
+## 功能
+
+管理后台包含七个页面：
+
+| 页面 | 主要功能 |
+| --- | --- |
+| 概览 | 当前节点、域名、配置存储与可选用量信息 |
+| 节点配置 | 协议、传输、路径、TLS、ECH、指纹与其他客户端参数 |
+| 订阅管理 | 节点与订阅链接、二维码、格式下载、自定义地址、订阅汇聚与转换设置 |
+| 测速与优选 | 网络信息、网站延迟、IPv4 / IPv6 候选生成、延迟与下载测速、筛选和导出 |
+| 路由与代理 | ProxyIP、上游代理、域名白名单、路径模板、按地区加载与验证公开代理 |
+| 访问日志 | 管理和订阅访问记录、搜索及类型筛选 |
+| 设置 | 外观主题、完整 / 简洁视图、配置备份、原始 JSON、用量与通知、部署文件下载 |
+
+### 协议与订阅
+
+- **VLESS / Trojan**：WebSocket、gRPC `gun` / `multi`、XHTTP `stream-one`。
+- **Shadowsocks**：AES-128-GCM / AES-256-GCM，通过 WebSocket 传输。
+- **订阅输出**：通用 / Base64、Clash / Mihomo、sing-box、Surge、Quantumult X、Loon；部分格式使用配置的外部转换服务。
+- **配置维护**：常用字段表单、完整 JSON 编辑、导入导出，以及登录后的当前 Worker / Pages ZIP 下载。
+
+具体兼容范围及验证状态见[功能对照](docs/upstream-feature-matrix.md)。可选的订阅转换、地址目录、探测、通知及代理出口服务仍有各自的外部依赖。
+
+### 手动测速
+
+测速只在点击后运行一轮，完成后停止；打开页面不会自动测速，也没有定时重测。可随时停止，离开测速页或页面进入后台会取消当前测速。
+
+- 支持 IPv4、IPv6、CIDR、起止 IP 区间及 TXT / CSV 来源，候选数量为 **1–4096**。
+- **生成候选只处理地址数据**；延迟测速与下载测速分别由按钮启动。
+- 支持筛选、排序、勾选、复制、CSV 导出及追加到自定义地址列表。
+- 追加后需分别保存 **地址列表 `ADD.txt`** 和 **主配置**，使用本地来源并关闭随机 IP，再更新客户端订阅。
+
+测速由当前浏览器连接所选探测服务；网站延迟是请求耗时，下载测速会实际传输数据。结果受浏览器网络和服务可用性影响，客户端连接仍需单独验证。
+
+## 界面预览
+
+以下为本地运行截图。点击图片文件可查看原始尺寸；本地测试环境信息不代表生产出口。
+
+### 管理概览
+
+[![桌面管理概览](docs/images/admin-desktop.png)](docs/images/admin-desktop.png)
+
+### 测速与优选
+
+[![手动测速页面](docs/images/speedtest-desktop.png)](docs/images/speedtest-desktop.png)
+
+<details>
+<summary>查看移动端与夜间主题</summary>
+
+| 移动端管理 | 移动端测速 |
+| --- | --- |
+| [![移动端管理](docs/images/admin-mobile.png)](docs/images/admin-mobile.png) | [![移动端测速](docs/images/speedtest-mobile.png)](docs/images/speedtest-mobile.png) |
+
+[![夜间主题](docs/images/speedtest-dark.png)](docs/images/speedtest-dark.png)
+
+</details>
+
+## 本地开发
+
+修改源码或在本地运行时，需要 **Node.js 22 或以上版本**。
 
 ```sh
 git clone https://github.com/Brclio/brclio-cloudflare-tz.git
 cd brclio-cloudflare-tz
 npm ci
-npm run build
-```
-
-如果下载的是 GitHub 的源码 ZIP，先解压，在包含 `package.json` 的文件夹打开终端，再执行最后两条命令。
-
-构建完成后，项目里的 `dist` 文件夹会出现以下文件：
-
-| 文件或目录 | 用途 |
-| --- | --- |
-| `dist/brclio-edge-pages.zip` | **本教程要上传到 Pages 的文件** |
-| `dist/pages/` | Pages 命令行上传目录，也是 Pages Git 构建输出目录 |
-| `dist/_worker.js` | 已打包的独立 Worker，可用于 Workers 控制台或 Wrangler |
-| `dist/build-manifest.json` | 构建信息、资源列表与校验值 |
-
-**请选择构建后的 `brclio-edge-pages.zip`。** GitHub 的「Download ZIP」得到的是源码，不能直接替代这个部署包；`src/worker.js` 也包含源码模块导入，不能直接整段粘贴到控制台运行。
-
-**本步完成标志：** 电脑中存在 `dist/brclio-edge-pages.zip`。
-
-## 第二步：将域名接入 Cloudflare
-
-对应原片：[04:08 添加域名](https://www.youtube.com/watch?v=chcFg878840&t=248s)、[04:47 替换 NS](https://www.youtube.com/watch?v=chcFg878840&t=287s)。
-
-如果你的域名已在同一个 Cloudflare 账号中正常托管，直接进入第三步。
-
-1. 登录 Cloudflare，在域名入口选择「添加域名 / Add a domain」。
-2. 输入你能够管理的域名，例如 `example.com`。输入域名本身，不加 `https://` 或网页路径。
-3. 选择适合自己的方案。原片选择 **Free**。
-4. 检查扫描到的 DNS 记录。如果域名已有网站或邮箱，要保留这些业务需要的记录。
-5. Cloudflare 会分配两条名称服务器，也叫 **NS / Nameservers**。
-6. 回到域名注册商的「名称服务器 / DNS 服务器」设置，把名称服务器改成刚分配给你的两条。
-7. 返回 Cloudflare，选择已更新名称服务器并检查状态，等待域名显示 **Active / 已激活**。
-
-这里填写的是 Cloudflare 为**你的域名**分配的 NS；不要复制视频作者的两条服务器。传播时间并不固定，原片中的几分钟仅是一次示例。
-
-若只想把一个子域名接到 Pages，可以让原 DNS 服务商继续管理 DNS，再按第六步添加 CNAME；根域名的接入要求不同，见 [Pages 自定义域官方说明](https://developers.cloudflare.com/pages/configuration/custom-domains/)。
-
-**本步完成标志：** 域名已激活，或者已经确定子域名的 DNS 由哪一家服务商管理。
-
-## 第三步：创建 KV 命名空间
-
-对应原片：[05:59 创建 KV](https://www.youtube.com/watch?v=chcFg878840&t=359s)。
-
-1. 回到 Cloudflare 的账号首页。
-2. 找到「存储和数据库 / Storage & databases → Workers KV」。
-3. 选择「创建 / Create」。
-4. 为命名空间取一个容易识别的名字，例如 `brclio-edge-config`。
-5. 创建后记住这个名字，下一步会在列表中选它。
-
-**这里的空间名称可以自己取；稍后绑定时的变量名称必须是大写 `KV`。** 两者用途不同。
-
-**本步完成标志：** Workers KV 列表里能找到 `brclio-edge-config`。
-
-## 第四步：创建 Pages 并上传
-
-对应原片：[06:26 创建 Pages](https://www.youtube.com/watch?v=chcFg878840&t=386s)、[07:22 上传文件](https://www.youtube.com/watch?v=chcFg878840&t=442s)。
-
-1. 打开「计算 / Compute → Workers 和 Pages / Workers & Pages」。
-2. 选择「创建应用 / Create application」，进入 **Pages** 创建入口。
-3. 选择「上传资产 / Upload assets」或「拖放文件」。不同版本的控制台文案可能略有变化。
-4. 输入项目名称，例如 `brclio-edge`。名称被占用时换一个你自己的名称。
-5. 将第一步生成的 **`dist/brclio-edge-pages.zip`** 拖入上传区域。
-6. 确认文件上传完成后点击「部署站点 / Deploy site」。
-7. 部署成功后继续进入项目。
-
-Cloudflare 会给项目分配一个 `*.pages.dev` 地址，请记下控制台实际显示的地址。此时还未完成 `ADMIN` 和 `KV` 配置，看到安装提示是正常的。
-
-本项目使用 Pages 的 `_worker.js` 高级模式，官方支持通过控制台拖放上传。直接上传模式与 Git 集成模式不能在同一项目内随意切换；希望自动跟随 Git 更新的读者，可直接选择后面的 [Pages Git 部署](#pages-git-部署)。[官方上传说明](https://developers.cloudflare.com/pages/get-started/direct-upload/)
-
-**本步完成标志：** Pages 项目中出现首次成功部署。
-
-## 第五步：设置 ADMIN 和 KV
-
-对应原片：[07:41 设置管理密码](https://www.youtube.com/watch?v=chcFg878840&t=461s)、[08:04 添加 KV 绑定](https://www.youtube.com/watch?v=chcFg878840&t=484s)。
-
-### 1. 设置管理密码
-
-进入刚创建的 **Pages 项目 → 设置 → 变量和机密**，确认当前编辑的是 **生产 / Production** 环境。
-
-新增：
-
-| 项目 | 填写内容 |
-| --- | --- |
-| 类型 | 机密 / Secret；若界面显示「加密」选项，请启用 |
-| 变量名称 | `ADMIN` |
-| 值 | 你自己生成并保存的长随机密码 |
-
-名称是 **`ADMIN`，共五个英文字母，全部大写**。视频字幕少了一个 `I`，实际画面是正确的。此变量的值就是管理密码，不需要另外创建用户名。
-
-### 2. 绑定刚才的 KV
-
-进入 **设置 → 绑定 / Bindings → 添加 → KV 命名空间**：
-
-| 项目 | 填写内容 |
-| --- | --- |
-| 变量名称 / Binding name | `KV` |
-| KV 命名空间 | 选择第三步创建的 `brclio-edge-config` |
-| 环境 | 生产 / Production |
-
-保存。`KV` 区分大小写，不能写成 `kv`，也不能把命名空间的显示名写到绑定名里。
-
-### 3. 建议同时设置固定 UUID
-
-`UUID` 是客户端使用的节点身份标识。可以新增名为 `UUID` 的机密，填入自己生成的 **UUID v4**。电脑上可执行：
-
-```sh
-node -e "console.log(require('node:crypto').randomUUID())"
-```
-
-把本次生成的值保存到你自己的配置中，不使用教程里的共享示例值。设置固定 `UUID` 后，后续单独更换 `ADMIN` 密码不会因此改变 UUID；未设置时，程序会从管理密码与密钥派生 UUID。
-
-其他常见环境变量：
-
-| 变量 | 是否需要 | 用途 |
-| --- | --- | --- |
-| `ADMIN` | 必填 | 管理密码 |
-| `KV` | 必须绑定资源 | 不是普通文本变量，而是 KV 命名空间绑定 |
-| `UUID` | 建议 | 固定节点 UUID v4 |
-| `HOST` | 可选 | 固定节点域名，例如 `edge.example.com`；默认依据当前访问域名 |
-| `KEY` | 可选 | 自定义密钥；修改后旧管理会话失效，未固定 UUID 时也会影响派生 UUID |
-| `OFF_LOG` | 可选 | 设为 `true` 可关闭 KV 访问日志记录 |
-| `PROXYIP` | 可选 | 自定义默认反代地址，先用默认配置完成连接再调整 |
-
-新变量和绑定要在**下一次部署**中才生效。原片和 [Cloudflare 官方绑定说明](https://developers.cloudflare.com/pages/functions/bindings/)都包含这一点，请继续完成第六步。
-
-**本步完成标志：** 生产环境存在 `ADMIN` 机密，且 `KV` 指向自己创建的命名空间。
-
-## 第六步：绑定域名并重新部署
-
-对应原片：[08:32 自定义域](https://www.youtube.com/watch?v=chcFg878840&t=512s)、[09:58 再次部署](https://www.youtube.com/watch?v=chcFg878840&t=598s)。
-
-### 1. 添加自定义域
-
-1. 打开 **Pages 项目 → 自定义域 / Custom domains → 设置自定义域**。
-2. 输入实际使用的域名，例如 `edge.example.com`，点击继续。
-3. 查看 Cloudflare 提供的 DNS 记录。
-4. 如果域名已由同账号的 Cloudflare 管理，界面可能会自动添加 CNAME，按提示确认即可。
-5. 如果需要手动配置，在负责该域名的 DNS 控制台新增 CNAME：名称填写对应子域，目标填写**本 Pages 项目**的 `*.pages.dev` 地址。
-6. 回到 Pages 激活域名，等待验证与证书准备完成，状态变为 **Active / 已激活**。
-
-示意如下，填写时以自己控制台的数据为准：
-
-| 类型 | 名称 | 目标 |
-| --- | --- | --- |
-| CNAME | `edge` | `你的项目.pages.dev` |
-
-必须先在 Pages 添加自定义域，再处理 DNS。仅在 DNS 中增加 CNAME、没有关联 Pages 项目，可能返回 522。已有相同名称记录时应先核对用途，避免产生冲突。[官方自定义域说明](https://developers.cloudflare.com/pages/configuration/custom-domains/)
-
-### 2. 重新上传并部署到生产环境
-
-1. 返回 Pages 的「部署」页面。
-2. 选择「创建部署 / Create deployment」。
-3. 环境选择 **生产 / Production**。
-4. 再次上传 `dist/brclio-edge-pages.zip`。
-5. 点击「保存并部署」，等待新部署成功。
-
-这一步会让第五步的变量和 KV 绑定进入实际运行的版本。每次修改此类部署配置后，都应创建新部署。
-
-**本步完成标志：** 自定义域显示已激活，最新生产部署的时间晚于变量和绑定的保存时间。
-
-## 第七步：登录自己的管理后台
-
-对应原片：[10:21 登录后台](https://www.youtube.com/watch?v=chcFg878840&t=621s)。
-
-在浏览器访问：
-
-```text
-https://edge.example.com/admin
-```
-
-将域名换成自己的。未登录时会进入 Brclio 登录页，输入第五步设置的 `ADMIN` 密码。
-
-登录成功后会看到七个入口：
-
-| 本项目页面 | 用来做什么 | 对应原片内容 |
-| --- | --- | --- |
-| 概览 | 查看协议、配置存储状态和连接信息 | 原片登录后的设置页概况 |
-| 节点配置 | 协议、传输方式、路径、TLS 等 | 原片高级设置里的详细配置 |
-| 订阅管理 | 复制链接、选择输出格式、配置优选来源 | 获取节点链接、优选订阅生成 |
-| 测速与优选 | 查询网络信息、手动测试延迟或下载、筛选候选地址 | 本项目新增页面；原片在客户端中演示连接测试 |
-| 路由与代理 | ProxyIP、上游代理和域名白名单 | Cloudflare CDN 访问设置 |
-| 访问日志 | 查找实际管理与订阅访问记录 | 原上游日志能力 |
-| 设置 | 可选用量/通知、主配置备份、完整 JSON | 原片高级设置及本项目维护功能 |
-
-修改常规表单后，点击右上角 **「保存配置」**，看到成功状态后再离开。地址列表、用量凭据、Bot 凭据使用各自的保存按钮。
-
-右上角的主题按钮可以切换日间与夜间配色；**「设置 → 工作空间外观」** 还可选择完整或简洁视图。简洁视图会收起辅助工具，需要这些工具时切回完整视图。外观选择保存在当前浏览器中。
-
-管理登录会话有效期为 24 小时。退出后需要重新登录。后台能够读取配置，说明管理与存储链路正常；客户端能否连通，还需要下一步验证。
-
-**本步完成标志：** 用自己的密码登录，概览中能显示实际域名和已读取的配置。
-
-## 第八步：生成订阅并导入客户端
-
-对应原片：[10:40 订阅设置](https://www.youtube.com/watch?v=chcFg878840&t=640s)、[11:25 导入客户端](https://www.youtube.com/watch?v=chcFg878840&t=685s)。
-
-### 1. 先认识两种链接
-
-| 链接 | 外观 | 用法 |
-| --- | --- | --- |
-| 单节点链接 | `vless://…`、`trojan://…` 等 | 导入一个节点；修改配置后通常需要重新导入 |
-| 订阅地址 | `https://你的域名/sub?token=…` | 客户端通过此地址获取节点列表，以后可以更新 |
-
-视频中的第二栏是 **「自适应订阅」**，不是另一种协议。日常使用推荐复制订阅地址。
-
-### 2. 配置订阅来源
-
-打开 **「订阅管理」**：
-
-1. 初次使用保留本地来源和随机 IP，先用少量节点完成连接。
-2. 按需要设置随机数量和端口。原片将数量改成 50，但它只是演示；数量并不代表带宽或一定更快。
-3. 点击顶部 **「保存配置」**。
-4. 在「订阅与节点链接」中选择输出格式：v2rayN 可先使用 **自动识别** 或 **通用 / Base64**；其他客户端选择相应格式。
-5. 点击复制订阅。也可以用「下载当前格式」保存配置文件。
-
-每个可用链接旁都有 **「二维码」** 按钮，可用可信客户端扫描导入。二维码与链接包含相同的连接凭据；链接过长无法生成时，使用复制链接即可。
-
-如果使用自定义地址：
-
-1. 在订阅来源中使用本地地址库，并关闭「随机 IP」。
-2. 在「自定义优选地址」每行填写一个自己验证可用的地址。
-3. 点击 **「保存地址列表」**；再点击顶部 **「保存配置」**，保存来源开关。
-
-地址写法示意：
-
-```text
-自己的优选地址:443#节点备注
-```
-
-这里的「自己的优选地址」必须替换为真实可用的 IP 或域名。随机地址池属于候选入口，最终性能需要客户端实测。
-
-### 3. 在 v2rayN 中导入
-
-1. 从 [v2rayN 官方仓库](https://github.com/2dust/v2rayN)获取适合自己系统的版本。
-2. 在 Brclio 后台复制订阅地址。
-3. 打开 v2rayN，使用「配置项 → 从剪贴板导入分享链接」。若当前版本没有自动识别为订阅，可以在「订阅分组」新增分组并粘贴订阅 URL。
-4. 在「订阅分组」执行更新，等待列表中出现节点。**导入地址和更新节点列表是两个动作。**
-5. 选择节点，测试连接，再设为活动配置。
-6. 按客户端提示启用系统代理，选择适合自己的路由模式；原片演示的是全局代理。
-7. 用浏览器访问实际需要的站点，检查连接结果。完成测试后，按自己的日常需求调整代理模式。
-
-原片使用 v2rayN V7.16.8，新版菜单可能不同，可参阅 [v2rayN 官方 UI 说明](https://github.com/2dust/v2rayN/wiki/Description-of-some-ui)。
-
-后台改过协议、路径、UUID、域名或订阅来源后，回到客户端更新订阅。管理页面显示「已保存」不会自动更新客户端已有的配置。
-
-### 4. 完成后的检查
-
-- 自定义域通过 HTTPS 正常打开。
-- `/admin` 可以使用自己的管理密码登录。
-- 修改一个配置后保存、刷新，设置仍然存在。
-- 客户端更新订阅成功，能看到节点。
-- 活动节点能完成实际网络请求。
-
-前四项验证配置链路，最后一项验证实际连接。速度、出口地区和第三方站点可用性请以自己的测试为准。
-
-## 测速与优选：按需运行一轮
-
-本节说明本项目新增的 **「测速与优选」** 页面。所有测速都由按钮启动，完成一轮即停止；打开页面、切换页面或等待不会自动启动，也没有定时重测。
-
-### 1. 先选择要了解什么
-
-| 页面功能 | 怎样开始 | 结果含义 |
-| --- | --- | --- |
-| 网络与出口信息 | 点击「查询网络信息」 | 当前浏览器访问相应服务时看到的 IP、地区和网络信息 |
-| 网站延迟测速 | 编辑网站列表与采样次数，点击「开始网站延迟测速」 | 浏览器请求的耗时，包含 DNS、TLS 等开销；不是 ICMP Ping |
-| 在线优选地址 | 先生成候选，再点击延迟或下载测速 | 当前浏览器到所选测速服务的测量结果，用于筛选候选入口 |
-| 本地测速工具目录 | 点击加载目录，筛选后打开项目 | 查看在自己电脑上运行的独立测速工具及其安装说明 |
-
-浏览器的跨域限制可能使某些查询失败，或只能记录请求用时而不能读取网站的 HTTP 状态。后台的测试结果不能单独证明代理客户端已经连通；应用地址后仍要在客户端更新订阅并实际测试。
-
-### 2. 准备候选地址
-
-在 **「在线优选地址」** 中，可以选择以下一种来源：
-
-- **本地范围预设**：选择 IPv4、IPv6 或两者，再点击「使用所选范围」。
-- **自己填写**：每行一个 IPv4 / IPv6 地址、CIDR 网段或起止 IP 区间，可添加 `#备注`。CIDR 是「网段地址 / 前缀长度」的写法，例如页面预设的 `104.16.0.0/13`。
-- **导入文件**：选择 TXT 或 CSV；CSV 至少包含 `IP`、`IP地址`、`地址` 或 `address` 列，可另带 `端口` / `port` 列。
-- **远端地址库**：选择预设或填写 HTTPS 来源 URL，再点击「获取来源列表」。该按钮只获取来源，读取完成后不会自动测速。
-
-设置 **「候选数量」为 1–4096**，再填写目标端口。测速页中 `0` 表示随机选择一个受支持的 TLS 端口，其他端口须为 `1–65535`；订阅来源里的「指定端口」则以 `-1` 表示自动选择，请按各字段提示填写。带端口的 IPv6 地址使用 `[IPv6地址]:端口` 写法。
-
-点击 **「生成候选」**。列表出现「未测试」表示地址已经生成，**此动作只处理输入，不会向候选地址发起测速**。实际条数可能少于设定数量，例如填写的范围本身没有足够多的不重复地址。可以先使用少量候选确认测速服务可用，再扩大范围。
-
-### 3. 手动选择延迟或下载测速
-
-1. 确认「测速服务域名」。需要备用服务时点击「切换备用测速服务」；切换本身不会开始测试。
-2. 设置延迟并发和每次超时，点击 **「开始延迟测速」**，运行当前候选的一轮延迟检测。
-3. 使用搜索、IPv4 / IPv6 等筛选条件和排序，查看结果并勾选想进一步测试的地址。
-4. 设置每个地址的下载 MB 上限与最长秒数，点击 **「下载测速 · 选中或全部」**。已有勾选时测试选中地址；没有勾选时测试当前全部候选。行内「测速」按钮只测该地址的下载速度。
-5. 按需切换「延迟从低到高」或「速度从高到低」，比较本轮结果。下载测速会真实传输数据，其用量取决于地址数量、上限、耗时和停止时机。
-
-测速过程中可点击页面顶部 **「停止所有检测」**，取消未完成的测速请求和队列。离开此页面、切换到其他页面或让浏览器页面进入后台也会停止当前测速；回到页面不会自动恢复，需要再次手动开始。
-
-测速请求由当前浏览器连接所选的第三方探测服务。浏览器所用网络、IPv6 支持、服务可用性和跨域策略都会影响结果；页面中的 MB、Mbps 与延迟是本轮测量值，不是 Cloudflare 套餐保证或永久性能承诺。
-
-### 4. 把选中结果用于订阅
-
-1. 勾选要保留的地址，可以逐项选择，也可使用「选中当前筛选结果」。
-2. 点击 **「追加选中到地址列表」**。界面会进入「订阅管理」，将结果追加到地址编辑框，并把表单中的优选来源设为本地地址库、关闭「随机 IP」。
-3. 点击 **「保存地址列表」**，把追加内容保存到 `ADD.txt`。
-4. 再点击顶部 **「保存配置」**，保存本地来源和关闭随机 IP 的设置。若未保存这一步，客户端仍可能继续使用原来的随机来源。
-5. 在客户端更新订阅，选择新节点并验证实际连接。
-
-也可以「复制选中地址」或「导出 CSV」保留结果；导出本身不会修改订阅。CSV 导出的是当前筛选结果，追加操作写入的是勾选地址。
-
-## 高级设置
-
-对应原片：[13:02 高级配置](https://www.youtube.com/watch?v=chcFg878840&t=782s)。
-
-### ProxyIP 与上游代理
-
-在 **「路由与代理」** 设置自动或自定义 ProxyIP、已有上游代理和域名白名单。ProxyIP 决定 Worker 某些连接的后续出口，它与客户端访问的入口域名不同。
-
-原片演示了按地区选择第三方 ProxyIP。第三方地址可能变动；只有自己验证可用、来源可信的地址才适合长期配置。
-
-展开 **「代理路径模板」**，可直接在表单编辑 PROXYIP 及各代理协议的标准、全局路径。`{{IP:PORT}}` 表示生成节点时要替换的代理地址。也可点击「加载路径模板预设」，选择后点击「应用所选」；应用只改变表单，仍需「保存配置」并在客户端更新订阅。
-
-需要检测已有代理时，使用 **「手动验证代理出口」**，填写类型和地址后点击验证。展开 **「按地区查找公开代理」** 时，先点击「加载第三方列表」，再按地区筛选、选择候选并点击「验证所选候选」；可用「停止验证」结束队列。加载目录、选择类型或应用预设不会自动开始代理检测。这里的代理检测由 Worker 发起，测速页的浏览器入口测试有不同的执行位置。
-
-验证成功后才能应用选中的公开代理：PROXYIP 可选择最多 8 个，其余代理协议一次应用 1 个；最后保存主配置。目录中的地区、地图和数量是来源提供的信息，不代表代理当前一定可用。
-
-### 订阅转换
-
-在 **「订阅管理 → 订阅转换选项」** 配置转换后端与规则文件。Clash、sing-box 等某些输出格式沿用上游的外部订阅转换服务；通用订阅和单节点链接可用于先完成基本连接。
-
-使用外部转换时，该服务会参与获取与处理转换所需的订阅配置。需要自行控制此环节时，可设置自己的转换后端。后台界面本身不从转换后端加载脚本或样式。
-
-「验证当前转换后端」会在点击后查询版本；转换后端和规则预设也需要手动加载、选择并应用。**「展开规则全文」** 对应 `EXPAND`：向转换后端请求展开后的完整分流规则。修改后保存主配置，再更新客户端订阅，实际支持情况取决于转换后端。
-
-### 用量、日志与通知
-
-- **今日请求**：在「设置」中接入自己的 Cloudflare 用量查询配置后显示。未配置时的空状态不代表零用量，也不是实时带宽。
-- **访问日志**：记录订阅获取与管理操作。设置 `OFF_LOG=true` 时不会继续写入 KV 日志。
-- **Telegram**：先保存自己的 Bot 配置，再启用通知开关并保存主配置；不是安装必填项。测试通知会实际发送消息，仅在你主动点击并确认发送时进行，打开页面不会发送测试消息。
-
-### 备份与恢复
-
-使用 **「设置 → 导出主配置」** 保存 JSON。恢复时导入 JSON，确认内容后保存主配置。
-
-主配置备份**不包含**单独存储的 Cloudflare 查询凭据、Telegram Bot 凭据和 `ADD.txt` 地址列表。完整迁移时需要分别保留这些内容；环境变量和 KV 绑定也要在新部署中重新设置。
-
-原始 JSON 中没有表单入口的字段仍可编辑。先应用 JSON，再点击顶部「保存配置」。`HOST`、`UUID` 等运行时字段以实际域名和部署环境变量为准。
-
-### 下载当前部署程序
-
-打开 **「设置 → 版本与开源项目」**：
-
-- **复制当前 Worker 源码 / 下载 Worker.js**：取得当前运行版本的完整独立程序，可用于 Workers 控制台部署。
-- **下载 Pages ZIP**：取得含根目录 `_worker.js`、Pages 配套文件和许可证的安装包，可按第四步拖放上传。
-- **手动检查上游版本**：查看上游版本标识与当前集成版本；检查结果不会自动替换代码，升级需要重新构建和部署。
-
-这里下载的是当前部署版本，不是从上游临时拉取另一份后台。程序包包含界面与代码，不包含当前运行环境的 `ADMIN` 等机密和 KV 私有数据；迁移时仍需在新项目设置环境变量、绑定 KV，并分别迁移配置。首次安装还没有后台时，按第一步从源码构建部署包。
-
-## 常见问题
-
-| 现象 | 先检查什么 |
-| --- | --- |
-| `npm ci` 失败 | Node.js 是否为 22 或以上；终端是否位于包含 `package.json` 的项目根目录；npm 网络是否可用 |
-| Pages 上传后只有静态提示、找不到后台 | 是否上传了本项目构建后的 ZIP；确认 `_worker.js` 位于上传包根目录 |
-| 页面提示未完成初始化或 KV 未绑定 | 生产环境是否存在 `ADMIN`；绑定名是否为大写 `KV`；绑定后是否重新部署 |
-| 密码一直不正确 | 登录密码是 `ADMIN` 的值；检查输入法、空格和实际生产环境的值 |
-| 改了密码仍在用旧配置 | 变量保存后是否创建了新的生产部署；重新登录再检查 |
-| 自定义域一直验证中 | NS 是否生效；CNAME 目标是否为自己的 Pages 地址；是否有冲突记录或证书限制 |
-| 域名出现 522 | 是否只建了 CNAME，而没有在 Pages 的「自定义域」中关联域名 |
-| `/admin` 能打开，客户端不能连 | 分别检查客户端协议/传输兼容性、订阅是否最新、实际入口/出口连通性；后台成功不等于隧道通过实测 |
-| 浏览器打开订阅看到一串文字 | 订阅是供客户端读取的数据；将 URL 导入客户端，或使用明确匹配的输出格式 |
-| 订阅为空或导入报错 | 用通用格式测试；检查订阅来源、自定义地址与外部转换后端是否可用 |
-| 自定义地址保存后没生效 | 地址列表独立保存后，还要关闭随机 IP 并保存主配置，最后更新客户端订阅 |
-| 生成候选后没有延迟或速度 | 「生成候选」只生成地址；需要手动点击延迟或下载测速 |
-| 测速切走页面后停止 | 这是预期行为；停止、离页或进入后台会取消当前一轮，回来后手动重新开始 |
-| 测速失败或 IPv6 没有结果 | 检查当前浏览器网络、IPv6 支持、测速服务与跨域响应；可手动切换备用服务后重试 |
-| 找不到代理目录等辅助工具 | 在「设置 → 工作空间外观」切换到完整视图，再展开相应栏目 |
-| 换密码后节点失效 | 未设置固定 UUID 时，管理密码会影响派生 UUID；设置自己的固定 UUID 后重新获取并更新订阅 |
-| 请求用量不显示 | 用量查询是可选配置；未配置时不会提供虚构的统计数字 |
-| 原片的速度、地区与自己不同 | 原片只是作者当时的测试，结果受网络、候选入口、出口和目标服务影响 |
-
-## 本地开发
-
-本地预览使用 Wrangler 的本地运行环境，不需要先发布到 Cloudflare。
-
-```sh
-npm ci
 cp .dev.vars.example .dev.vars
 ```
 
-Windows PowerShell 可将复制命令改为：
-
-```powershell
-Copy-Item .dev.vars.example .dev.vars
-```
-
-打开 `.dev.vars`，替换 `ADMIN` 的示例值，生成自己的 UUID 并替换 `UUID`；然后启动：
+编辑 `.dev.vars`，设置自己的 `ADMIN` 密码和 UUID v4，然后启动：
 
 ```sh
 npm run dev
 ```
 
-访问 [本地管理后台](http://localhost:8787/admin)，使用 `.dev.vars` 中设置的密码登录。
+打开 [http://localhost:8787/admin](http://localhost:8787/admin)，使用 `ADMIN` 登录。Windows PowerShell 可用 `Copy-Item .dev.vars.example .dev.vars` 复制示例配置。
 
-`wrangler.toml` 中全零的 KV ID 是本地占位值；本地 KV 数据由 Wrangler 保存，与 Cloudflare 生产数据独立。`.dev.vars` 和本地运行数据已被 Git 忽略，不应放进发布包。
+本地运行使用 Wrangler 的本地 KV。`wrangler.toml` 中全零的 KV ID 是本地占位值，部署前必须替换；`.dev.vars` 与本地运行数据已被 Git 忽略。
 
-### 常用命令
+### 构建与检查
 
-| 命令 | 作用 |
+| 命令 | 用途 |
 | --- | --- |
-| `npm run dev` | 构建并在 8787 端口启动本地 Worker |
-| `npm run check` | 检查源码 JavaScript 语法 |
-| `npm test` | 运行自动化测试 |
-| `npm run build` | 构建 Worker、Pages 目录和上传 ZIP |
-| `npm run deploy` | 构建并发布 Workers，需要真实账号与配置 |
-| `npm run deploy:pages` | 构建并上传 Pages 目录，需要已有项目与账号配置 |
+| `npm run dev` | 构建并启动本地 Worker，端口 8787 |
+| `npm run check` | 检查源码、前端和构建脚本的 JavaScript 语法 |
+| `npm test` | 构建并运行自动化测试 |
+| `npm run build` | 生成独立 Worker、Pages 目录、上传 ZIP 与构建清单 |
+| `npm run build:tutorial` | 重新生成内嵌原图的独立 HTML 教程 |
 
-本地界面、接口与测试通过不能替代 Cloudflare 线上隧道、客户端和不同网络的实测。本仓库不将未执行的线上部署或连通性写作已通过。
+测试覆盖管理会话、配置持久化、订阅、真实 workerd 到本地 TCP 的协议转发、手动测速控制及下载产物再启动。具体执行环境、结果和限制见[验证记录](docs/validation.md)；本地与受控测试不等同于 Cloudflare 生产部署或公网客户端验收。
 
-## 其他部署方式
+## 部署说明
 
-### Workers 命令行部署
+普通部署使用上方 Release 中的预构建文件。需要修改代码、Git 集成或命令行部署时，再下载源码并执行 `npm ci && npm run build`。
 
-先完成本地依赖安装，再使用自己的 Cloudflare 账号：
+| 方式 | 部署内容 / 命令 |
+| --- | --- |
+| Pages 控制台拖放（推荐） | 上传 Release 下载的 `brclio-edge-pages.zip` |
+| Workers 控制台 | 将 Release 下载的 `_worker.js` 的完整内容放入代码编辑器 |
+| Pages Git 集成（源码） | 构建命令 `npm ci && npm run build`，输出目录 `dist/pages` |
+| Workers 命令行（源码） | 配置真实 KV namespace ID 和机密后执行 `npm run deploy` |
+| Pages 命令行（源码） | 配置项目与绑定后执行 `npm run deploy:pages` |
 
-```sh
-npx wrangler login
-npx wrangler kv namespace create KV
+生产环境的基本配置：
+
+| 名称 | 类型 | 说明 |
+| --- | --- | --- |
+| `ADMIN` | 机密 | 必填，管理后台密码 |
+| `KV` | KV 命名空间绑定 | 必须绑定自己的存储空间，名称为大写 `KV` |
+| `UUID` | 机密 | 建议固定为自己的 UUID v4，作为节点身份凭据 |
+| `HOST` | 环境变量，可选 | 固定节点域名，默认根据访问域名生成 |
+
+Pages 的变量和绑定应设置在目标部署环境中，保存后重新部署。完成域名配置后访问 `https://你的域名/admin`。
+
+**认准 Release 附件的文件名。** GitHub「Code → Download ZIP」和 Release 中的「Source code」都是源码，不能直接作为 Pages 部署包。自行构建时，对应产物是 `dist/brclio-edge-pages.zip`、`dist/_worker.js` 和 `dist/pages/`；不能直接粘贴带模块导入的 `src/worker.js` 到 Workers 编辑器。
+
+已经运行本项目的实例，可在 **「设置 → 版本与开源项目」** 下载当前版本的 Worker 或 Pages ZIP。下载程序不包含运行时机密和 KV 私有数据；迁移时需重新配置环境变量、KV 绑定及所需数据。
+
+### 完整教程
+
+下载 [brclio-edge-tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.0/brclio-edge-tutorial.html) 后，**双击文件即可在浏览器打开**。教程是可独立打开的单文件 HTML，内嵌样式与截图；截图可按原始尺寸查看。仓库内也保留 [docs/tutorial.html](docs/tutorial.html) 与 [原始 PNG](docs/tutorial-assets/original/)。
+
+教程包含账号与域名准备、KV 创建、Pages / Workers 部署、后台配置、客户端订阅及测速操作，并提供章节导航、进度勾选、命令复制和故障搜索。在 GitHub 文件页查看时，请先下载 HTML 文件再打开。
+
+## 架构与目录
+
+```mermaid
+flowchart LR
+    A[管理浏览器] --> W[Cloudflare Worker]
+    C[代理客户端] --> W
+    W <--> K[(Workers KV)]
+    W --> T[目标服务 / 上游代理]
+    A -- 手动测速 --> P[探测服务]
 ```
 
-将命令返回的真实 namespace ID 填入 `wrangler.toml` 的 `[[kv_namespaces]]` 中，替换全零占位值；可以同时修改 `name` 为自己的 Worker 名称。
-
-然后设置机密并部署：
-
-```sh
-npx wrangler secret put ADMIN
-npx wrangler secret put UUID
-npm run deploy
-```
-
-各命令提示输入时填入自己的管理密码和 UUID。首次设置机密可能提示创建同名 Worker，按自己的部署计划完成创建。部署后在 Workers 控制台确认 KV 绑定与机密正确，再按需要添加自定义域。
-
-### Workers 控制台部署
-
-1. 在 Cloudflare 创建自己的 Worker。
-2. 本地执行 `npm run build`。
-3. 打开 `dist/_worker.js`，将完整构建结果替换到 Worker 代码编辑器。
-4. 在 Worker 设置中添加 `ADMIN`、建议的固定 `UUID` 和名为 `KV` 的资源绑定。
-5. 保存并部署，访问实际域名的 `/admin`。
-
-直接粘贴的是 **`dist/_worker.js`**，不是 `src/worker.js`。后台资源已内嵌在构建后的文件中。
-
-### Pages Git 部署
-
-如果希望提交代码后自动构建，创建 Pages 项目时选择 Git 集成并连接自己的仓库，使用：
-
-| 构建项 | 值 |
-| --- | --- |
-| 框架预设 | 无 / None |
-| 构建命令 | `npm ci && npm run build` |
-| 输出目录 | `dist/pages` |
-| 根目录 | 项目根目录 |
-| Node.js | 22 或以上，可按控制台支持方式设置 `NODE_VERSION=22` |
-
-随后同样设置生产环境 `ADMIN`、`UUID` 与 `KV`，再触发新的生产部署。预览分支若需测试，请配置独立的预览环境和测试 KV，避免与生产混用。Git 集成的后续行为见 [Cloudflare 官方说明](https://developers.cloudflare.com/pages/configuration/git-integration/)。
-
-## 项目结构与二次开发
+Worker 提供隧道、订阅和管理 API，KV 保存配置与日志。本地前端资源在构建时嵌入 Worker，管理界面无需运行时下载远端 HTML、字体或 CDN 脚本。
 
 ```text
-src/worker.js             隧道、订阅及管理接口的集成入口
-src/panel.js              管理认证、响应、配置校验与本地资源访问
-src/admin-tools.js        手动目录、转换后端、通知与代理辅助接口
-src/downloads.js          当前版本 Worker / Pages ZIP 下载
-src/grpc.js               gRPC Hunk / MultiHunk 消息解析
-public/                  Brclio 登录页、管理页与初始化提示
-public/assets/           本地样式、交互代码与品牌资源
-public/assets/speedtest.js 手动测速、候选生成与结果筛选
-scripts/build.mjs        构建独立 Worker 和 Pages 上传包
-tests/                   自动化验证
-docs/video-research.md   指定视频观看证据与纠错记录
-wrangler.toml            Workers 部署配置，本地 KV ID 为占位值
-.dev.vars.example        本地配置示例
+src/
+  worker.js                 隧道、订阅与管理路由
+  panel.js                  登录会话、配置校验与页面资源
+  admin-tools.js            手动目录与管理辅助接口
+  grpc.js                   gRPC Hunk / MultiHunk 解析
+  downloads.js              当前 Worker / Pages ZIP 下载
+public/
+  admin.html                管理后台
+  login.html                登录页
+  assets/                   样式、交互、测速、二维码及品牌资源
+scripts/                    构建与语法检查
+tests/                      自动化测试
+docs/                       教程、设计、架构与验证文档
+wrangler.toml               Workers 配置
+.dev.vars.example           本地环境变量示例
 ```
 
-修改界面后执行构建即可将新资源打入部署包。默认品牌资源和页面均在仓库内，可以按许可证修改为自己的名称与样式。
+## 文档导航
 
-构建检查、自动化测试、真实浏览器操作与响应式截图的具体范围和结果见[本地验证记录](docs/validation.md)；逐项功能与行为差异见[上游功能对照矩阵](docs/upstream-feature-matrix.md)，源码结构见[架构分析](docs/architecture.md)。记录中的受控测试与本地结果不等同于真实 Cloudflare 部署或公网测速已通过。
+| 文档 | 内容 |
+| --- | --- |
+| [部署与使用教程](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.0/brclio-edge-tutorial.html) | Release 附件，下载后直接打开的完整图文教程 |
+| [架构与上游分析](docs/architecture.md) | 固定基线、请求分流、配置状态与外部依赖 |
+| [上游功能对照](docs/upstream-feature-matrix.md) | 功能对应关系及实现、验证边界 |
+| [管理 API 契约](docs/api-contract.md) | 管理接口、请求与配置行为 |
+| [设计说明](docs/design.md) | Brclio 界面与交互设计 |
+| [教程源文件](docs/tutorial-src/README.md) | 图文教程的维护、构建与原图更新 |
+| [验证记录](docs/validation.md) | 自动化检查、真实浏览器操作与未执行的验收 |
+| [第三方来源与许可](THIRD_PARTY_NOTICES.md) | 代码、字体、组件和其他材料的来源 |
 
-贡献前请运行 `npm run check`、`npm test` 和 `npm run build`，并检查桌面与移动端的重要操作。提交问题时描述部署方式、所用客户端、操作步骤与错误信息；公开内容中请移除管理密码、UUID、订阅 token 和代理凭据。
+## 贡献
 
-## 来源、版权与开放使用
+欢迎提交问题、文档改进和代码变更。提交前请运行：
 
-- **协议与隧道基础**：[cmliu/edgetunnel](https://github.com/cmliu/edgetunnel)。本次基础版本为 `2026-09-04 16:24:13`，固定提交 [`448a83ced00a43c1d892d5ecbed86a26ea9eeaff`](https://github.com/cmliu/edgetunnel/commit/448a83ced00a43c1d892d5ecbed86a26ea9eeaff)。
-- **视觉设计与本项目改造**：Brclio，采用 Brclio Design System 的视觉语言重新实现管理工作空间。
-- **教程参考**：[零度解说指定视频](https://www.youtube.com/watch?v=chcFg878840)，感谢原作者的演示与资料组织。本文是适配本项目的独立文字教程。
-- **代码许可证**：[GPL-2.0-only](LICENSE)。本项目发布的代码允许商业使用；不额外加上「仅非商业」限制。
-- **第三方材料**：各原作者署名及许可证详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。原视频和原作者素材不因本项目开源而自动改为 GPL。
+```sh
+npm run check
+npm test
+npm run build
+```
 
-欢迎使用、改造、分享，并继续保留上游和贡献者的来源。
+界面改动应检查桌面与移动端的重要操作；协议或管理行为改动应补充相关回归测试。问题报告请包含部署方式、客户端版本、复现步骤及错误信息，并移除管理密码、UUID、订阅 token 和代理凭据。
+
+## 开源许可与署名
+
+本项目采用 [GNU GPL-2.0-only](LICENSE)。允许个人及商业使用、修改与再分发；分发修改版本时，请遵守 GPL 的源码提供和许可证保留要求。
+
+隧道与协议代码基于 **[cmliu/edgetunnel](https://github.com/cmliu/edgetunnel)**，固定基线为 [`448a83ced00a43c1d892d5ecbed86a26ea9eeaff`](https://github.com/cmliu/edgetunnel/commit/448a83ced00a43c1d892d5ecbed86a26ea9eeaff)，上游版本标识为 `2026-09-04 16:24:13`。Brclio 独立实现管理界面、构建工具、教程与本地改造，保留上游代码署名及贡献者来源。
+
+完整来源、第三方组件许可证和设计材料边界见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。字体和二维码组件保留各自的 OFL / MIT 许可证。
