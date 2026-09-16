@@ -1,10 +1,29 @@
 # 独立 HTML 教程验证
 
-日期：2026-09-16。对象：`docs/tutorial.html`，源码位于 `docs/tutorial-src/`。本次版本使用 Release 预构建下载作为部署入口，并加入本地 UUID 生成。发布前另补齐 Worker 与 Pages 包内的组件许可，未改动隧道逻辑。
+日期：2026-09-16。对象：`docs/tutorial.html`，源码位于 `docs/tutorial-src/`。以下分别记录 v1.0.1 的局部回归与 v1.0.0 的历史完整检查。
 
-## 结果
+## v1.0.1 局部回归
 
-**50 项浏览器检查通过**，详细结果与最终文件 SHA-256 见 [validation.json](tutorial-assets/validation.json)。
+本轮仅更新公开下载说明与 v1.0.1 附件链接，**实际执行 19 项浏览器检查，全部通过**。历史 50 项完整交互检查没有在本轮重跑，也不计入这 19 项。详细结果见 [validation.json](tutorial-assets/validation.json) 的 `latestVerification`。
+
+- 使用独立 Playwright 会话 `brclio-release-qa`，在浏览器断网状态下直接打开 `file://` 教程，无需本地 HTTP 服务。
+- 320、390、1440 px 三种宽度下，折叠内容关闭和全部展开时均无横向溢出。
+- 准备项明确「下载部署包无需 GitHub 账号」，正文和 README 明确「无需登录 GitHub」，未保留私有仓库访问前提。
+- Pages ZIP、Worker 与教程 HTML 三条附件链接均指向 `v1.0.1`；本轮核对链接地址，没有联网下载或验证待发布附件的远端可用性。
+- 9 张原图均能离线解码为 1920×1200；静态复核的 10 个内嵌实例（概览复用一次）与原始 PNG、截图清单 SHA-256 全部一致。
+- 内嵌字体正常加载，脚本正常初始化；本轮没有 JavaScript 运行错误或外部 HTTP 请求。
+
+最终教程 SHA-256：
+
+```text
+b4e624321bf45a1966bfc30169551849721f811ee6d19678cb67a93cdc2e6aad
+```
+
+## v1.0.0 历史完整检查
+
+以下 50 项来自先前完整检查；当时的教程 SHA-256 为 `c916567eeeb8717554fea6376a340d21a4bd3e0d609fe006da6ab35147130406`。该轮包含 Release 预构建下载入口与本地 UUID 生成；发布前另补齐 Worker 与 Pages 包内的组件许可，未改动隧道逻辑。
+
+**历史完整检查 50 项通过**，原始结果保留在 [validation.json](tutorial-assets/validation.json) 的 `browserChecks` 与 `finalArtifactChecks`；`historicalFullRun` 标明其版本与原文件 SHA-256。
 
 - 桌面与手机宽度：1920、1440、1024、900、768、390、375、320 px，正文无横向溢出。320 px 展开全部折叠内容后仍通过。
 - 目录定位、当前章节、短桌面视口目录滚动，以及手机目录的打开、跳转、Esc 关闭和 Tab 焦点循环通过。

@@ -1,6 +1,6 @@
-# 本地验证记录
+# 验证与发布记录
 
-核验日期：2026-09-15。这里记录实际执行过的检查，便于维护者复现；不代表已在 Cloudflare 生产环境部署。
+首次本地核验：2026-09-15；发布复核：2026-09-16。这里记录实际执行过的检查，便于维护者复现；不代表已在 Cloudflare 生产环境部署。
 
 ## 构建与自动化检查
 
@@ -113,7 +113,7 @@
 
 ## 尚未执行的验收
 
-- 未推送 GitHub、创建 Release 或执行线上 Cloudflare 部署；GitHub Actions 文件已提供，但未宣称云端 CI 已运行。
+- 未在 Cloudflare 生产账号执行线上部署；GitHub 源码推送、Release 与云端 CI 已完成，见下方发布记录。
 - 未修改真实域名、DNS、账号机密或线上 KV。
 - 未在真实客户端和公网环境完成 VLESS / Trojan / Shadowsocks、gRPC / XHTTP、代理出口、UDP、ECH、第三方订阅转换的完整组合测试。
 - 未使用真实凭据验证 Cloudflare 用量或 Telegram 通知投递，也未做实际手机硬件与 Safari / Firefox 验证。
@@ -130,3 +130,24 @@
 - 发布时只取明确的 Worker、Pages ZIP、教程和构建清单，另生成源码提交与 SHA-256 清单；不打包 `dist/dry-run`、本地变量或 KV 数据。Release 附件的校验信息见版本内 `release-manifest.json` 与 `SHA256SUMS.txt`。
 
 本段验证适用于发布版本；前面的 117 项及原始浏览器记录保留为 2026-09-15 的初次验收事实。
+
+
+## GitHub 发布与公开下载核验 — 2026-09-16
+
+- [v1.0.0 正式版](https://github.com/Brclio/brclio-cloudflare-tz/releases/tag/v1.0.0) 已发布，对应源码提交 `d5f44c1d98b4e762a8289a4138613f0e08883e3f`。
+- [GitHub Actions 35076721835](https://github.com/Brclio/brclio-cloudflare-tz/actions/runs/35076721835) 已成功完成；此前“未推送、未发布、未运行云端 CI”的说明已更新。
+- 仓库可见性现为公开。未携带 GitHub 登录凭据下载 Worker、Pages ZIP 与 HTML 教程，三个附件均返回 HTTP 200，文件 SHA-256 与已发布清单一致。
+- Release 提供预构建程序、独立教程、构建清单、版本清单及 SHA-256 校验和。源码包与 Pages 部署 ZIP 是不同文件，README 与教程均按文件名说明用途。
+
+此处确认的是源码和发行附件公开可用，不表示已在 Cloudflare 生产环境部署。
+
+
+## v1.0.1 发布前复核 — 2026-09-16
+
+- 修正 README 与独立教程中已过时的私有仓库说明，删除“下载需要 GitHub 账号”的前提；下载链接统一到 v1.0.1。
+- 构建横幅和构建清单从 `package.json` 读取版本；管理接口版本同步为 1.0.1。未改动协议、管理交互或测速逻辑。
+- Node.js 22.23.2 下 `npm run check`、`npm test` 通过，**119 项通过，0 失败，0 跳过**。
+- `wrangler deploy --dry-run` 通过，gzip **614.31 KiB**；版本字段、Worker 校验和、ZIP 的 8 个根文件及其中 Worker 字节一致性均通过。
+- 教程重新构建时，9 张原始截图的 SHA-256 与尺寸检查通过。v1.0.0 的 50 项完整教程检查保留为历史记录，本次改动的局部复核另见[教程验证](tutorial-validation.md)。
+
+发布后的 CI 状态、对应源码和附件校验信息见 [v1.0.1 Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/tag/v1.0.1) 及该版本的 `release-manifest.json`。

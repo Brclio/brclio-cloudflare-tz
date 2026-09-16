@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 
 const root = path.resolve(import.meta.dirname, '..');
+const { version } = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const assets = {};
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.png': 'image/png' };
 async function collect(dir) {
@@ -35,7 +36,7 @@ await build({
     b.onResolve({ filter: /^brclio:source$/ }, () => ({ path: 'source', namespace: 'brclio-source' }));
     b.onLoad({ filter: /.*/, namespace: 'brclio-source' }, () => ({ contents: 'export default "__BRCLIO_SOURCE_TEXT_SLOT__";', loader: 'js' }));
   } }],
-  banner: { js: '/* Brclio Edge 1.0.0 | Modified 2026-09-15 by Brclio | Based on cmliu/edgetunnel 448a83ced00a43c1d892d5ecbed86a26ea9eeaff | GPL-2.0-only. See LICENSE and THIRD_PARTY_NOTICES.md. */' }
+  banner: { js: `/* Brclio Edge ${version} | Modified 2026-09-16 by Brclio | Based on cmliu/edgetunnel 448a83ced00a43c1d892d5ecbed86a26ea9eeaff | GPL-2.0-only. See LICENSE and THIRD_PARTY_NOTICES.md. */` }
 });
 // Keep the exact deployed source available to the authenticated download API.
 // A single source-template slot avoids any network dependency or stale binary.
@@ -59,5 +60,5 @@ for (const name of ['_worker.js', 'index.html', '_routes.json', 'LICENSE.txt', '
 }
 await writeFile(path.join(root, 'dist/brclio-edge-pages.zip'), zipSync(zipFiles, { level: 9 }));
 const worker = await readFile(path.join(root, 'dist/_worker.js'));
-await writeFile(path.join(root, 'dist/build-manifest.json'), JSON.stringify({ version: '1.0.0', upstream: '448a83ced00a43c1d892d5ecbed86a26ea9eeaff', assets: Object.keys(assets), workerBytes: worker.length, sha256: createHash('sha256').update(worker).digest('hex') }, null, 2) + '\n');
+await writeFile(path.join(root, 'dist/build-manifest.json'), JSON.stringify({ version, upstream: '448a83ced00a43c1d892d5ecbed86a26ea9eeaff', assets: Object.keys(assets), workerBytes: worker.length, sha256: createHash('sha256').update(worker).digest('hex') }, null, 2) + '\n');
 console.log(`Built standalone Worker (${(worker.length / 1024).toFixed(0)} KiB), ${Object.keys(assets).length} local assets, and dist/brclio-edge-pages.zip`);

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "output": "docs/tutorial.html",
-  "bytes": 2342731,
-  "sha256": "c916567eeeb8717554fea6376a340d21a4bd3e0d609fe006da6ab35147130406",
+  "bytes": 2342707,
+  "sha256": "b4e624321bf45a1966bfc30169551849721f811ee6d19678cb67a93cdc2e6aad",
   "fontSha256": "41d25455976b8d3509a5a608e2d99a6e9524378da3620786cab20987ed863fc0",
   "figures": 9,
   "originalImages": [

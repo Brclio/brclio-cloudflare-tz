@@ -321,7 +321,7 @@
     ]
   },
   "totalPassingChecks": 50,
-  "finalArtifactSha256": "c916567eeeb8717554fea6376a340d21a4bd3e0d609fe006da6ab35147130406",
+  "finalArtifactSha256": "b4e624321bf45a1966bfc30169551849721f811ee6d19678cb67a93cdc2e6aad",
   "staticChecks": {
     "readmeLocalTargetsValid": true,
     "internalAnchorsAndAriaReferencesValid": true,
@@ -330,5 +330,208 @@
     "embeddedScriptEqualsSource": true,
     "noExternalRuntimeResources": true,
     "fontHeadingsCovered": true
-  }
+  },
+  "historicalFullRun": {
+    "version": "v1.0.0",
+    "date": "2026-09-16",
+    "finalArtifactSha256": "c916567eeeb8717554fea6376a340d21a4bd3e0d609fe006da6ab35147130406",
+    "totalPassingChecks": 50,
+    "fields": [
+      "browserChecks",
+      "finalArtifactChecks",
+      "downloadHashVerified",
+      "staticChecks"
+    ],
+    "note": "These existing 50 checks describe the earlier full run. They were not rerun or added to the v1.0.1 targeted count."
+  },
+  "latestVerification": {
+    "version": "v1.0.1",
+    "scope": "Targeted regression for release links and public-access wording; historical 50 checks were not rerun.",
+    "environment": "Chromium via Playwright CLI; direct file:// with browser network offline; no deployment or remote asset download.",
+    "passed": true,
+    "total": 19,
+    "failures": [],
+    "checks": [
+      {
+        "name": "v1.0.1 final tutorial opens directly from file with network offline",
+        "passed": true
+      },
+      {
+        "name": "offline script initializes FAQ search",
+        "passed": true
+      },
+      {
+        "name": "embedded heading font loads offline",
+        "passed": true
+      },
+      {
+        "name": "public downloads explicitly require no GitHub login",
+        "passed": true
+      },
+      {
+        "name": "preparation explicitly requires no GitHub account for downloads",
+        "passed": true
+      },
+      {
+        "name": "old private repository access instruction is absent",
+        "passed": true
+      },
+      {
+        "name": "v1.0.1 release attachment href: brclio-edge-pages.zip",
+        "passed": true,
+        "detail": {
+          "href": "https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/brclio-edge-pages.zip",
+          "remoteDownloadAttempted": false
+        }
+      },
+      {
+        "name": "v1.0.1 release attachment href: _worker.js",
+        "passed": true,
+        "detail": {
+          "href": "https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/_worker.js",
+          "remoteDownloadAttempted": false
+        }
+      },
+      {
+        "name": "v1.0.1 release attachment href: brclio-edge-tutorial.html",
+        "passed": true,
+        "detail": {
+          "href": "https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/brclio-edge-tutorial.html",
+          "remoteDownloadAttempted": false
+        }
+      },
+      {
+        "name": "all versioned release links use v1.0.1",
+        "passed": true
+      },
+      {
+        "name": "all nine original figures decode offline at 1920x1200",
+        "passed": true,
+        "detail": [
+          {
+            "name": "login",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "overview",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "nodes",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "subscriptions",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "manual-speedtest",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "routing",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "settings-backup",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "settings-download",
+            "width": 1920,
+            "height": 1200
+          },
+          {
+            "name": "settings",
+            "width": 1920,
+            "height": 1200
+          }
+        ]
+      },
+      {
+        "name": "no horizontal overflow at 320px with details collapsed",
+        "passed": true,
+        "detail": {
+          "viewportWidth": 320,
+          "documentWidth": 320,
+          "bodyWidth": 320
+        }
+      },
+      {
+        "name": "no horizontal overflow at 390px with details collapsed",
+        "passed": true,
+        "detail": {
+          "viewportWidth": 390,
+          "documentWidth": 390,
+          "bodyWidth": 390
+        }
+      },
+      {
+        "name": "no horizontal overflow at 1440px with details collapsed",
+        "passed": true,
+        "detail": {
+          "viewportWidth": 1440,
+          "documentWidth": 1440,
+          "bodyWidth": 1440
+        }
+      },
+      {
+        "name": "no horizontal overflow at 320px with details expanded",
+        "passed": true,
+        "detail": {
+          "viewportWidth": 320,
+          "documentWidth": 320,
+          "bodyWidth": 320
+        }
+      },
+      {
+        "name": "no horizontal overflow at 390px with details expanded",
+        "passed": true,
+        "detail": {
+          "viewportWidth": 390,
+          "documentWidth": 390,
+          "bodyWidth": 390
+        }
+      },
+      {
+        "name": "no horizontal overflow at 1440px with details expanded",
+        "passed": true,
+        "detail": {
+          "viewportWidth": 1440,
+          "documentWidth": 1440,
+          "bodyWidth": 1440
+        }
+      },
+      {
+        "name": "no external HTTP requests during offline local QA",
+        "passed": true,
+        "detail": []
+      },
+      {
+        "name": "no JavaScript runtime errors during local QA",
+        "passed": true,
+        "detail": []
+      }
+    ],
+    "checkedAt": "2026-09-16T14:24:35.246699+00:00",
+    "finalArtifactSha256": "b4e624321bf45a1966bfc30169551849721f811ee6d19678cb67a93cdc2e6aad",
+    "artifactBytes": 2342707,
+    "session": "brclio-release-qa",
+    "staticChecks": {
+      "readmePublicNoLoginStatement": true,
+      "readmeThreeReleaseAssetsPointToV1_0_1": true,
+      "allNineOriginalPngHashesMatch": true,
+      "embeddedPngInstances": 10,
+      "artifactMatchesFinalBuildSha256": true
+    },
+    "remoteReleaseAvailabilityChecked": false
+  },
+  "totalPassingChecksScope": "Historical v1.0.0 full run only; latestVerification.total is the separate v1.0.1 targeted run."
 }
