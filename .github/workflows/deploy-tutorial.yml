@@ -1,0 +1,57 @@
+name: Deploy tutorials to GitHub Pages
+
+on:
+  push:
+    branches: [codex/deploy-tutorial]
+    paths:
+      - 'docs/tutorial-src/**'
+      - 'docs/tutorial-assets/**'
+      - 'docs/tutorial.html'
+      - 'docs/github-deploy.html'
+      - 'public/assets/brand.svg'
+      - 'licenses/NotoSerifSC-OFL.txt'
+      - 'LICENSE'
+      - 'scripts/build-tutorial*.mjs'
+      - 'package.json'
+      - '.github/workflows/deploy-tutorial.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages-tutorial
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/codex/deploy-tutorial'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - uses: actions/configure-pages@v5
+      # Both tutorial scripts use only Node.js built-ins; no app dependencies needed.
+      - run: npm run build:tutorial-site
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/tutorial
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy tutorials
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -11,6 +11,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:tutorial": "node scripts/build-tutorial.mjs",
+    "build:tutorial-site": "npm run build:tutorial && node scripts/build-tutorial-site.mjs",
     "dev": "npm run build && wrangler dev --local --port 8787",
     "check": "node scripts/check.mjs",
     "pretest": "npm run build",

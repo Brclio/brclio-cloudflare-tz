@@ -6,6 +6,8 @@
 
 [下载 Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) · [高清部署图文教程](docs/tutorial.html) · [GitHub 自动部署与同步教程](docs/github-deploy.html) · [功能对照](docs/upstream-feature-matrix.md) · [验证记录](docs/validation.md) · [许可证](LICENSE)
 
+在线阅读：[部署与使用教程](https://brclio.github.io/brclio-cloudflare-tz/) · [GitHub 自动部署与同步教程](https://brclio.github.io/brclio-cloudflare-tz/github-deploy.html)。教程站从 `codex/deploy-tutorial` 分支通过 GitHub Actions 发布，维护方式见[教程站部署说明](docs/tutorial-site.md)。
+
 两篇教程均为内嵌图片与字体的独立 HTML，可在仓库文件页选择 **Download raw file** 后打开；放在同一目录时可互相跳转。当前仓库版新增 28 张高清操作标注图，支持点击放大、原始尺寸查看和图片下载；也可下载下方 v1.0.4 的教程合集 ZIP，解压后打开。
 
 ## 快速部署
