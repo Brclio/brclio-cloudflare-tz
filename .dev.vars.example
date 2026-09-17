@@ -1,5 +1,0 @@
-# Local development only. Copy to .dev.vars and replace this value.
-ADMIN="replace-with-a-long-random-password"
-# Set a fixed UUID before sharing subscription links.
-UUID="00000000-0000-4000-8000-000000000001"
-OFF_LOG="true"
