@@ -56,3 +56,25 @@ test('stopping an active download aborts its reader and does not report an inven
   try{await assert.rejects(()=>P.download({ip:'192.0.2.1',bits:32,port:443},'probe.example.test',run,{bytes:4096,seconds:1},()=>run.stop()),/已停止|Stopped/);assert.equal(aborted,true);assert.equal(run.controllers.size,0);assert.equal(run.readers.size,0);}
   finally{globalThis.fetch=originalFetch;}
 });
+
+test('result filters combine multiple real categories and all seven fields sort in both directions',async()=>{
+  await import('../public/assets/speedtest.js');const {resultRows}=globalThis.BrclioSpeedtest;
+  const rows=[
+    {address:'192.0.2.20:443',bits:32,type:'电信',country:'JP',colo:'NRT',latency:40,speed:12,selected:true,status:'完成',note:'东京'},
+    {address:'192.0.2.3:443',bits:32,type:'联通',country:'JP',colo:'KIX',latency:10,speed:30,selected:false,status:'完成',note:'大阪'},
+    {address:'[2001:db8::1]:443',bits:128,type:'电信',country:'US',colo:'LAX',latency:80,speed:2,selected:true,status:'完成'},
+    {address:'192.0.2.9:443',bits:32,type:'电信',country:'JP',colo:'NRT',latency:null,speed:null,selected:false,status:'失败：超时'},
+  ];
+  const filters={ipType:['IPv4'],type:['电信','联通'],country:['JP'],colo:['NRT','KIX']};
+  assert.deepEqual(resultRows(rows,{filters,sort:'latency'}).map(row=>row.address),[rows[1].address,rows[0].address,rows[3].address]);
+  assert.deepEqual(resultRows(rows,{filters,state:'selected'}).map(row=>row.address),[rows[0].address]);
+  assert.deepEqual(resultRows(rows,{filters,search:'大阪'}).map(row=>row.address),[rows[1].address]);
+  assert.deepEqual(resultRows(rows,{filters:{ipType:['IPv6'],country:['JP']}}),[],'Independent filter groups must intersect');
+  for(const key of ['address','ipType','type','country','colo','latency','speed']){
+    const full=rows.slice(0,3),asc=resultRows(full,{sort:key}),desc=resultRows(full,{sort:key,direction:'desc'});
+    const value=row=>key==='ipType'?(row.bits===128?'IPv6':'IPv4'):row[key];
+    assert.deepEqual(asc.map(value),desc.map(value).reverse(),`${key} must support both directions`);
+  }
+  for(const sort of ['latency','speed'])for(const direction of ['asc','desc'])assert.equal(resultRows(rows,{sort,direction}).at(-1),rows[3],'Unmeasured values stay last in either direction');
+  assert.deepEqual(rows.map(row=>row.selected),[true,false,true,false],'Filtering and sorting never alter the selection');
+});

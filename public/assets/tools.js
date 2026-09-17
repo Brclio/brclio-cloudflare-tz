@@ -111,7 +111,15 @@
   let theme = 'light', mode = 'full';
   try { theme = localStorage.getItem('brclio-edge-theme') || 'light'; mode = localStorage.getItem('brclio-edge-view') || 'full'; } catch { /* Storage is optional. */ }
   function applyTheme(value) { theme = value === 'dark' ? 'dark' : 'light'; document.documentElement.dataset.theme = theme; $('theme-toggle').setAttribute('aria-label', theme === 'dark' ? '切换日间主题' : '切换夜间主题'); try { localStorage.setItem('brclio-edge-theme', theme); } catch {} }
-  function applyMode(value) { mode = value === 'simple' ? 'simple' : 'full'; document.body.dataset.view = mode; try { localStorage.setItem('brclio-edge-view', mode); } catch {} }
+  function applyMode(value, { expand = false } = {}) {
+    mode = value === 'simple' ? 'simple' : 'full'; document.body.dataset.view = mode;
+    if ($('view-mode')) $('view-mode').value = mode;
+    $('expert-mode').checked = mode === 'full';
+    $('expert-mode-status').textContent = mode === 'full' ? '已开启 · 完整视图' : '已关闭 · 简洁视图';
+    if (expand && mode === 'full') document.querySelectorAll('details.advanced-tool').forEach((section) => { section.open = true; });
+    try { localStorage.setItem('brclio-edge-view', mode); } catch {}
+  }
+  $('expert-mode').addEventListener('change', () => applyMode($('expert-mode').checked ? 'full' : 'simple', { expand: true }));
   $('theme-toggle').addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
   applyTheme(theme); applyMode(mode);
   const hostsNotice = make('div', 'hosts-notice'); hostsNotice.id = 'hosts-mismatch-notice'; hostsNotice.hidden = true; hostsNotice.setAttribute('role', 'status');
@@ -132,10 +140,17 @@
     hostsNotice.hidden = !mismatch || Date.now() < hostsNoticeUntil;
     if (!hostsNotice.hidden) hostsNoticeDescription.textContent = '你正在通过 ' + current + ' 访问。当前节点主机列表为 ' + hosts.join('、') + '；生成的订阅会使用列表中的域名。可在「节点配置 → 节点主机名」核对并保存。';
   }
-  const preferences = panel('workspace-preferences', '工作空间外观', '按你的习惯选择显示方式。简洁视图收起辅助工具，切回完整视图即可使用所有功能。');
+  const preferences = panel('workspace-preferences', '工作空间外观', '按你的习惯选择显示方式。简洁视图收起其他页面的辅助工具；进阶配置始终展示全部选项。通过进阶页的工具入口可直接打开所需功能。');
   const preferenceGrid = make('div', 'field-grid'); preferences.append(preferenceGrid);
   const viewSelect = field(preferenceGrid, '界面显示', 'view-mode', { value: mode, options: [['full', '完整视图 · 全部设置与工具'], ['simple', '简洁视图 · 常用配置']] });
-  viewSelect.addEventListener('change', () => applyMode(viewSelect.value));
+  viewSelect.addEventListener('change', () => applyMode(viewSelect.value, { expand: true }));
+  document.addEventListener('brclio:reveal', (event) => {
+    const destination = $(event.detail);
+    if (mode === 'simple' && document.body.dataset.page !== 'advanced' && destination?.closest('.advanced-tool')) {
+      applyMode('full'); viewSelect.value = mode;
+      B.toast('已切换到完整视图，并打开所选工具。');
+    }
+  });
   const appearance = field(preferenceGrid, '配色主题', 'appearance-mode', { value: theme, options: [['light', '日间 · 暖纸'], ['dark', '夜间 · 墨色']] });
   appearance.addEventListener('change', () => applyTheme(appearance.value));
   $('theme-toggle').addEventListener('click', () => { appearance.value = theme; });
@@ -148,6 +163,7 @@
 
   // Remote address preview / aggregation: no request until the user presses Preview.
   const apiPanel = panel('subscription-tools', '优选接口与订阅汇聚', '验证远程地址接口，预览结果后追加接口地址或当前结果。不会自动改写保存的列表。', { details: true, advanced: true });
+  apiPanel.parentElement.id = 'address-api-tool';
   const apiGrid = make('div', 'field-grid'); apiPanel.append(apiGrid);
   const apiURL = field(apiGrid, 'API / 订阅 URL', 'address-api-url', { full: true, placeholder: 'https://… 或 GitHub 文件链接' });
   const apiPort = field(apiGrid, '默认端口', 'address-api-port', { type: 'number', value: '443', min: 1, max: 65535 });
@@ -174,6 +190,7 @@
   actions(apiPanel, previewButton, appendURL, appendResults);
 
   const chainPanel = panel('subscription-tools', '添加链式代理节点', '先验证你自己的上游代理，再生成自定义列表条目；可以为每个节点使用不同出口。', { details: true, advanced: true });
+  chainPanel.parentElement.id = 'chain-proxy-tool';
   const chainGrid = make('div', 'field-grid'); chainPanel.append(chainGrid);
   const chainName = field(chainGrid, '节点名称', 'chain-name', { placeholder: '我的链式代理' });
   const chainHost = field(chainGrid, '优选域名 / IP', 'chain-host', { placeholder: '留空使用当前节点域名' });
@@ -237,6 +254,7 @@
   });
 
   const proxyPanel = panel('routing-tools', '手动验证代理出口', '检测由当前 Worker 发起。输入代理地址后点击验证；选择协议或打开页面不会触发检测。', { advanced: true });
+  proxyPanel.parentElement.id = 'proxy-check-tool';
   const proxyGrid = make('div', 'field-grid'); proxyPanel.append(proxyGrid);
   const proxyType = field(proxyGrid, '检测协议', 'proxy-check-type', { options: ['proxyip', 'socks5', 'http', 'https', 'turn', 'sstp'] });
   const proxyAddress = field(proxyGrid, '待验证地址', 'proxy-check-address', { type: 'password', placeholder: 'IP:端口 或 user:password@host:port' });
@@ -259,6 +277,7 @@
   actions(proxyPanel, fillProxy, checkProxy, useProxy);
 
   const libraryPanel = panel('routing-tools', '按地区查找公开代理', '第三方列表可能随时变化。加载后筛选地区，可选择任意候选或整个地区进行手动验证；队列最多 8 并发，随时可以停止。应用出口时，PROXYIP 最多 8 个，其他协议 1 个。', { details: true, advanced: true });
+  libraryPanel.parentElement.id = 'proxy-library-tool';
   const libraryGrid = make('div', 'field-grid'); libraryPanel.append(libraryGrid);
   const libraryType = field(libraryGrid, '公开列表类型', 'proxy-library-type', { options: ['proxyip', 'socks5', 'http', 'https'] });
   const libraryRegion = field(libraryGrid, '目标地区', 'proxy-library-region', { options: [['', '全部地区']] });
@@ -404,14 +423,27 @@
   const projectPanel = panel('project-tools', '版本与开源项目', '查看运行中的版本，获取这份 Brclio Worker 的完整源码和 Pages 安装包。', { details: true });
   const versionSummary = make('p', 'field-hint'); projectPanel.append(versionSummary); const versionStatus = status(projectPanel, 'version-check-status');
   const checkVersion = button('手动检查上游版本', 'check-upstream-version', async () => run(checkVersion, versionStatus, async () => { const result = await catalog('version'); const version = result.data?.version ?? result.data; showStatus(versionStatus, '当前集成上游版本：' + (B.getMeta()?.upstreamVersion || '未知') + '；官方最新源码标识：' + String(version) + '。请先阅读变更记录，升级需要重新构建部署。'); }));
+  const changelog = make('details', 'tool-help upstream-changelog'); changelog.id = 'upstream-changelog';
+  changelog.append(make('summary', '', '上游更新日志内容'));
+  const changelogText = make('pre', 'changelog-content', '点击「查看上游更新日志」后加载。'); changelog.append(changelogText);
+  const changelogSource = make('p', 'field-hint'); changelog.append(changelogSource);
+  const changelogStatus = status(projectPanel, 'upstream-changelog-status');
+  const readChangelog = button('查看上游更新日志', 'read-upstream-changelog', async () => run(readChangelog, changelogStatus, async () => {
+    const result = await B.api('/admin/upstream-changelog');
+    if (typeof result.content !== 'string' || !result.content.trim()) throw new Error('上游没有返回可显示的更新日志，请重试。');
+    changelogText.textContent = result.content; changelogSource.textContent = result.source ? '来源：' + result.source : '';
+    changelog.open = true; showStatus(changelogStatus, '上游更新日志已加载。可再次点击刷新。');
+  }));
+  projectPanel.append(changelog);
   const copyWorker = button('复制当前 Worker 源码', 'copy-worker-source', async () => run(copyWorker, versionStatus, async () => { const source = await B.api('/admin/download/worker.js', { text: true }); await B.copy(source); showStatus(versionStatus, '已取得当前部署的 Brclio Worker 源码。'); }));
   const downloadWorker = make('a', 'button button-small', '下载 Worker.js'); downloadWorker.href = '/admin/download/worker.js'; downloadWorker.download = 'brclio-edge-worker.js';
   const downloadPages = make('a', 'button button-small', '下载 Pages ZIP'); downloadPages.href = '/admin/download/pages.zip'; downloadPages.download = 'brclio-edge-pages.zip';
-  actions(projectPanel, checkVersion, copyWorker, downloadWorker, downloadPages);
+  actions(projectPanel, checkVersion, readChangelog, copyWorker, downloadWorker, downloadPages);
   const projectLinks = make('div', 'tool-actions'); projectLinks.append(link('本项目提交记录 ↗', 'https://github.com/Brclio/brclio-cloudflare-tz/commits/main/'), link('上游更新记录 ↗', 'https://github.com/cmliu/edgetunnel/commits/main/'), link('第三方 Snippets 工具 ↗', 'https://github.com/EDT-Pages/EDT.min.js/tree/Snippets'), link('JShaman 第三方代码工具 ↗', 'https://www.jshaman.com/')); projectPanel.append(projectLinks);
   projectPanel.append(make('p', 'field-hint', 'Snippets 属于第三方独立项目，使用其自身源码和许可。这里保留项目入口；Brclio Worker 下载包含本项目全部开源界面。'));
   projectPanel.append(make('p', 'field-hint', 'JShaman 是外部代码处理服务。此入口只打开其网站，不会上传源码、配置或任何凭据。'));
   window.addEventListener('brclio:config', () => { renderUsage(); renderHostsNotice(); const meta = B.getMeta(); versionSummary.textContent = 'Brclio Edge ' + (meta?.version || '—') + ' · 集成上游 ' + (meta?.upstreamVersion || '—'); });
   renderUsage(); renderHostsNotice();
+  applyMode(mode, { expand: true });
   window.BrclioTools = { showQR };
 })();

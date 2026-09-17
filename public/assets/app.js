@@ -3,7 +3,7 @@
 
 const $ = (id) => document.getElementById(id);
 const state = { config: null, baseline: '', meta: null, logs: [], logsLoaded: false, logPage: 0, addressesBaseline: '', addressesLoaded: false, rawDirty: false, cfDirty: false, tgDirty: false, busy: false, page: 'overview' };
-const pageNames = { overview: '概览', nodes: '节点配置', subscriptions: '订阅管理', speedtest: '测速与优选', routing: '路由与代理', logs: '访问日志', settings: '设置' };
+const pageNames = { overview: '概览', nodes: '节点配置', subscriptions: '订阅管理', speedtest: '测速与优选', routing: '路由与代理', advanced: '进阶配置', logs: '访问日志', settings: '设置' };
 const bindings = [];
 const PAGE_SIZE = 25;
 let fieldSequence = 0;
@@ -104,7 +104,7 @@ function markChanged() {
 const schema = {
   'node-identity-fields': [
     { label: '当前访问域名', path: ['HOST'], readOnly: true, hint: '由当前请求域名决定。', tag: 'HOST' },
-    { label: '用户 UUID', path: ['UUID'], readOnly: true, secret: true, hint: '由 Cloudflare 环境变量 UUID 决定。', tag: 'UUID' },
+    { label: '用户 UUID', path: ['UUID'], readOnly: true, secret: true, action: 'copy', hint: '由 Cloudflare 环境变量 UUID 决定。', tag: 'UUID' },
     { label: '节点名称', path: ['优选订阅生成', 'SUBNAME'], required: true, hint: '客户端订阅中显示的名称。' },
     { label: 'WebSocket / HTTP 路径', path: ['PATH'], required: true, placeholder: '/', hint: '以 / 开头；部署设置中的 PATH 会覆盖此值。' },
     { label: '节点主机名', path: ['HOSTS'], type: 'array', full: true, required: true, rows: 3, hint: '每行一个可用域名。环境变量 HOST 存在时会覆盖此列表。' },
@@ -112,14 +112,16 @@ const schema = {
   'node-protocol-fields': [
     { label: '节点协议', path: ['协议类型'], type: 'select', options: [['vless', 'VLESS'], ['trojan', 'Trojan'], ['ss', 'Shadowsocks']] },
     { label: '传输协议', path: ['传输协议'], type: 'select', options: [['ws', 'WebSocket'], ['grpc', 'gRPC'], ['xhttp', 'XHTTP']] },
+  ],
+  'advanced-transport-fields': [
     { label: 'gRPC 模式', path: ['gRPC模式'], type: 'select', options: [['gun', 'gun（单流）'], ['multi', 'multi（多流）']], hint: '仅使用 gRPC 时生效。' },
     { label: 'gRPC User-Agent', path: ['gRPCUserAgent'], action: 'current-ua', hint: '用于 gRPC 订阅处理的客户端标识。' },
     { label: 'Shadowsocks 加密方式', path: ['SS', '加密方式'], type: 'select', options: ['aes-128-gcm', 'aes-256-gcm'], hint: '仅 Shadowsocks 生效。' },
     { label: 'Shadowsocks TLS', path: ['SS', 'TLS'], type: 'boolean', confirmDisable: true, hint: '为 Shadowsocks WebSocket 连接启用 TLS。关闭前会提示部署与 HTTP 端口要求。' },
   ],
   'node-security-fields': [
-    { label: '浏览器指纹', path: ['Fingerprint'], type: 'select', options: ['chrome', 'firefox', 'safari', 'ios', 'android', 'edge', 'random', 'randomized'] },
-    { label: 'ALPN', path: ['ALPN'], type: 'select', options: [['', '客户端默认'], ['h2,http/1.1', 'h2, http/1.1'], ['h2', 'h2'], ['http/1.1', 'http/1.1']] },
+    { label: '浏览器指纹', path: ['Fingerprint'], type: 'select', options: ['chrome', 'firefox', 'safari', 'ios', 'android', 'edge', '360', 'qq', 'random', 'randomized'] },
+    { label: 'ALPN', path: ['ALPN'], type: 'select', options: [['', '客户端默认'], ['h2,http/1.1', 'h2, http/1.1'], ['h2', 'h2'], ['http/1.1', 'http/1.1'], ['h3', 'h3'], ['h3,h2', 'h3, h2'], ['h3,h2,http/1.1', 'h3, h2, http/1.1']] },
     { label: 'TLS 分片', path: ['TLS分片'], type: 'select', nullable: true, options: [['', '关闭'], ['Shadowrocket', 'Shadowrocket'], ['Happ', 'Happ']], hint: '需要客户端支持对应分片参数。' },
     { label: '跳过证书验证', path: ['跳过证书验证'], type: 'boolean', hint: '关闭时验证证书。仅在明确需要时开启。' },
     { label: '0-RTT', path: ['启用0RTT'], type: 'boolean', hint: '向节点路径加入早期数据参数。' },
@@ -218,6 +220,10 @@ function createField(spec, { value, onChange, separate = false } = {}) {
       const options = el('datalist'); options.id = id + '-presets'; input.setAttribute('list', options.id);
       spec.presets.forEach((value) => { const option = el('option'); option.value = value; options.append(option); }); wrapper.append(options);
     }
+    if (spec.action === 'copy') {
+      const action = el('button', 'button button-small field-inline-action', '复制 ' + spec.tag); action.type = 'button';
+      action.addEventListener('click', () => copy(input.value)); wrapper.append(action);
+    }
     if (spec.action === 'current-ua') {
       const action = el('button', 'button button-small field-inline-action', '获取当前浏览器 UA'); action.type = 'button';
       action.addEventListener('click', () => { input.value = navigator.userAgent; input.dispatchEvent(new Event('input', { bubbles: true })); toast('已填写当前浏览器 User-Agent，请保存配置。'); }); wrapper.append(action);
@@ -240,10 +246,84 @@ function createField(spec, { value, onChange, separate = false } = {}) {
       input.checked = false;
     }
     if (onChange) onChange(next);
-    else { write(spec.path, next); markChanged(); }
+    else {
+      const key = spec.path.join('.');
+      const candidateFingerprint = key === 'Fingerprint' ? next : read(['Fingerprint']);
+      const enablesECH = key === 'ECH' ? next : key === 'Fingerprint' && read(['ECH']);
+      if (enablesECH && !['chrome', 'firefox'].includes(candidateFingerprint)) {
+        syncConfigControls();
+        if (!await confirmAction('ECH 需要兼容的浏览器指纹', '上游推荐 ECH 使用 chrome 或 firefox 指纹。继续将切换为 chrome；取消则保留修改前的设置。', '使用 chrome 并继续') || !input.isConnected) return;
+        write(['Fingerprint'], 'chrome');
+        if (key === 'Fingerprint') next = 'chrome';
+      }
+      write(spec.path, next);
+      applyLinkedChanges(key);
+      syncConfigControls({ preserveInput: spec.type === 'array' || spec.type === 'textarea' ? input : null }); markChanged();
+    }
   });
   if (!separate && spec.path) bindings.push({ input, spec });
   return wrapper;
+}
+function compatibilityIssues() {
+  if (!state.config) return [];
+  const ss = read(['协议类型']) === 'ss', noTLS = ss && read(['SS', 'TLS']) === false;
+  const issues = [];
+  if (ss && read(['传输协议']) !== 'ws') issues.push('Shadowsocks 仅支持 WebSocket 传输');
+  if ((ss || read(['传输协议']) === 'grpc') && read(['启用0RTT'])) issues.push('Shadowsocks / gRPC 不支持 0-RTT');
+  if (noTLS && read(['ECH'])) issues.push('Shadowsocks 关闭 TLS 时不能启用 ECH');
+  if (noTLS && read(['TLS分片'])) issues.push('Shadowsocks 关闭 TLS 时不能使用 TLS 分片');
+  if (read(['订阅转换配置', 'XUDP']) && !read(['订阅转换配置', 'UDP'])) issues.push('XUDP 需要同时开启 UDP');
+  return issues;
+}
+function applyLinkedChanges(key) {
+  const ss = read(['协议类型']) === 'ss';
+  if (key === '协议类型' && ss) write(['传输协议'], 'ws');
+  if (['协议类型', '传输协议'].includes(key) && (ss || read(['传输协议']) === 'grpc')) write(['启用0RTT'], false);
+  if (['协议类型', 'SS.TLS'].includes(key) && ss && read(['SS', 'TLS']) === false) { write(['ECH'], false); write(['TLS分片'], null); }
+  if (key === '订阅转换配置.XUDP' && read(['订阅转换配置', 'XUDP'])) write(['订阅转换配置', 'UDP'], true);
+  if (key === '订阅转换配置.UDP' && !read(['订阅转换配置', 'UDP'])) write(['订阅转换配置', 'XUDP'], false);
+}
+function syncConfigControls({ preserveInput = null } = {}) {
+  const ss = read(['协议类型']) === 'ss', noTLS = ss && read(['SS', 'TLS']) === false;
+  for (const { input, spec } of bindings) {
+    const value = read(spec.path), key = spec.path.join('.');
+    if (spec.type === 'boolean') input.checked = !!value;
+    else if (input !== preserveInput) {
+      const display = Array.isArray(value) ? value.join('\n') : value === null || value === undefined ? '' : String(value);
+      if (spec.type === 'select' && display && !Array.from(input.options).some((option) => option.value === display)) {
+        const option = el('option', '', display + '（当前值）'); option.value = display; input.append(option);
+      }
+      if (input.value !== display) { input.value = display; input.setCustomValidity(''); }
+    }
+    let reason = '';
+    if (key === '传输协议' && ss) reason = 'Shadowsocks 仅使用 WebSocket；选择其他节点协议后可更改。';
+    if (key === '启用0RTT' && (ss || read(['传输协议']) === 'grpc')) reason = '当前节点协议 / 传输方式不支持 0-RTT。';
+    if ((key === 'ECH' || key === 'TLS分片') && noTLS) reason = '请先开启 Shadowsocks TLS，才能使用此选项。';
+    input.disabled = state.busy || !!reason;
+    let hint = input.closest('.field').querySelector('.compatibility-hint');
+    if (reason && !hint) { hint = el('p', 'field-hint compatibility-hint'); hint.id = input.id + '-compatibility'; input.closest('.field').append(hint); }
+    if (hint) { hint.textContent = reason; hint.hidden = !reason; }
+    const described = (input.getAttribute('aria-describedby') || '').split(' ').filter((id) => id && id !== input.id + '-compatibility');
+    if (reason) described.push(input.id + '-compatibility');
+    if (described.length) input.setAttribute('aria-describedby', described.join(' ')); else input.removeAttribute('aria-describedby');
+  }
+  const issues = compatibilityIssues();
+  $('config-compatibility-notice').hidden = !issues.length;
+  $('config-compatibility-text').textContent = issues.length ? issues.join('；') + '。已加载的配置未被自动修改，可修正这些组合后再保存。' : '';
+}
+function cancelGroup(target) {
+  if (!state.config || state.busy || !schema[target]) return;
+  if (state.rawDirty) { toast('请先应用或处理原始 JSON 的未应用修改，再取消表单分组修改。', true); navigate('settings', { target: 'raw-disclosure' }); return; }
+  const baseline = JSON.parse(state.baseline);
+  for (const spec of schema[target]) {
+    if (spec.readOnly) continue;
+    const value = spec.path.reduce((current, key) => current?.[key], baseline);
+    if (value === undefined) {
+      const parent = spec.path.slice(0, -1).reduce((current, key) => current?.[key], state.config);
+      if (parent && typeof parent === 'object') delete parent[spec.path.at(-1)];
+    } else write(spec.path, clone(value));
+  }
+  syncConfigControls(); markChanged(); toast('已恢复本组上次保存的配置，其他分组修改已保留。');
 }
 function renderFields() {
   bindings.length = 0;
@@ -251,6 +331,7 @@ function renderFields() {
     const container = $(target); container.replaceChildren();
     fields.forEach((spec) => container.append(createField(spec, { value: read(spec.path) })));
   });
+  syncConfigControls();
   $('raw-config').value = JSON.stringify(state.config, null, 2);
   $('raw-error').hidden = true; $('raw-state').textContent = '与当前表单同步'; state.rawDirty = false;
 }
@@ -464,6 +545,7 @@ async function loadWorkspace({ preserveSeparate = false } = {}) {
   } finally { $('refresh-config').disabled = false; }
 }
 function validateConfig() {
+  if (compatibilityIssues().length) { toast('存在不兼容的选项组合，请先处理页面顶部提示后保存。', true); navigate('advanced'); return false; }
   for (const { input, spec } of bindings) {
     if (spec.readOnly) continue;
     if (!input.checkValidity()) {
@@ -501,12 +583,13 @@ async function saveConfig() {
     const loaded = await loadWorkspace({ preserveSeparate: true });
     toast(loaded ? '配置已保存。请在客户端更新订阅。' : '配置已保存，但重新读取失败。请刷新确认最新状态。', !loaded);
   } catch (error) { toast(error.message, true); }
-  finally { state.busy = false; bindings.forEach(({ input }) => { input.disabled = false; }); $('raw-config').disabled = false; updateSaveState(); }
+  finally { state.busy = false; syncConfigControls(); $('raw-config').disabled = false; updateSaveState(); }
 }
 function closeSidebar() { $('sidebar').classList.remove('open'); $('sidebar').inert = window.matchMedia('(max-width: 900px)').matches; $('sidebar-shade').hidden = true; $('menu-toggle').setAttribute('aria-expanded', 'false'); $('menu-toggle').setAttribute('aria-label', '打开导航'); }
-function navigate(page, { hash = true } = {}) {
+function navigate(page, { hash = true, target } = {}) {
   if (!pageNames[page]) page = 'overview';
   state.page = page;
+  document.body.dataset.page = page;
   document.querySelectorAll('.page').forEach((section) => { section.hidden = section.id !== 'page-' + page; });
   document.querySelectorAll('[data-nav]').forEach((link) => { const active = link.dataset.nav === page; link.classList.toggle('active', active); if (active) link.setAttribute('aria-current', 'page'); else link.removeAttribute('aria-current'); });
   $('breadcrumb-current').textContent = pageNames[page]; document.title = pageNames[page] + ' · Brclio Edge';
@@ -514,17 +597,38 @@ function navigate(page, { hash = true } = {}) {
   closeSidebar(); window.scrollTo({ top: 0 });
   document.dispatchEvent(new CustomEvent('brclio:navigate', { detail: page }));
   if (page === 'logs' && state.config && !state.logsLoaded) loadLogs();
+  const destination = typeof target === 'string' ? $(target) : null;
+  if (destination && destination.closest('.page')?.id === 'page-' + page) {
+    // Reveal the existing controls; navigation never creates a second form or starts a probe.
+    for (let parent = destination; parent && parent !== $('page-' + page); parent = parent.parentElement) {
+      if (parent.tagName === 'DETAILS') parent.open = true;
+    }
+    document.dispatchEvent(new CustomEvent('brclio:reveal', { detail: destination.id }));
+    requestAnimationFrame(() => {
+      if (state.page !== page) return;
+      if (!destination.hasAttribute('tabindex')) destination.setAttribute('tabindex', '-1');
+      destination.focus({ preventScroll: true });
+      destination.scrollIntoView({ block: 'start', behavior: 'instant' });
+    });
+  }
 }
 
 $('menu-toggle').addEventListener('click', () => { const opened = $('sidebar').classList.toggle('open'); $('sidebar').inert = !opened; $('sidebar-shade').hidden = !opened; $('menu-toggle').setAttribute('aria-expanded', String(opened)); $('menu-toggle').setAttribute('aria-label', opened ? '关闭导航' : '打开导航'); });
 window.matchMedia('(max-width: 900px)').addEventListener('change', closeSidebar);
 $('sidebar-shade').addEventListener('click', closeSidebar);
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeSidebar(); });
-document.querySelectorAll('a[href^="#"]').forEach((link) => link.addEventListener('click', (event) => { const page = link.getAttribute('href').slice(1); if (pageNames[page]) { event.preventDefault(); navigate(page); } }));
+document.querySelectorAll('a[href^="#"]').forEach((link) => link.addEventListener('click', (event) => { const page = link.getAttribute('href').slice(1); if (pageNames[page]) { event.preventDefault(); navigate(page, { target: link.dataset.target }); } }));
 window.addEventListener('hashchange', () => navigate(location.hash.slice(1), { hash: false }));
 window.addEventListener('beforeunload', (event) => { if (hasUnsaved()) { event.preventDefault(); event.returnValue = ''; } });
 $('logout').addEventListener('click', async (event) => { if (hasUnsaved()) { event.preventDefault(); if (await confirmAction('退出前，有内容尚未保存', '退出后未保存的修改将丢失。', '放弃修改并退出', true)) { state.config = null; state.rawDirty = false; state.cfDirty = false; state.tgDirty = false; state.addressesLoaded = false; location.href = '/logout'; } } });
 $('save-config').addEventListener('click', saveConfig);
+document.querySelectorAll('[data-reset-group]').forEach((button) => button.addEventListener('click', () => cancelGroup(button.dataset.resetGroup)));
+$('repair-config-compatibility').addEventListener('click', () => {
+  if (!state.config || state.busy) return;
+  if (state.rawDirty) { toast('请先应用原始 JSON，再修正选项组合。', true); navigate('settings', { target: 'raw-disclosure' }); return; }
+  applyLinkedChanges('协议类型'); applyLinkedChanges('传输协议'); applyLinkedChanges('SS.TLS'); applyLinkedChanges('订阅转换配置.XUDP');
+  syncConfigControls(); markChanged(); toast('已修正冲突组合，请检查表单并保存配置。');
+});
 $('refresh-config').addEventListener('click', async () => { if (hasUnsaved() && !await confirmAction('重新读取已保存配置？', '当前表单、地址列表和服务凭据中未保存的修改将被丢弃。', '放弃修改并刷新')) return; if (await loadWorkspace()) toast('工作空间已刷新。'); });
 $('retry-load').addEventListener('click', async () => { if (hasUnsaved() && !await confirmAction('重新读取已保存配置？', '未保存的修改将被丢弃。', '重新读取')) return; loadWorkspace(); });
 $('subscription-format').addEventListener('change', renderSubscriptionLinks);

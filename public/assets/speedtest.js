@@ -100,7 +100,24 @@
     } catch(error){if(timedOut && received && !run.stopped)return {mbps:speed(),bytes:received};throw error;}
     finally{clearTimeout(timer);controller.abort();run.controllers.delete(controller);if(reader){run.readers.delete(reader);await reader.cancel().catch(()=>{});}}
   }
-  const api={ipNumber,numberIP,parseEntry,candidates,probeURL,ManualRun,download,init};
+  function resultValue(row,key) {
+    if(key==='ipType')return row.bits===128?'IPv6':'IPv4';
+    return row[key]??'';
+  }
+  function resultRows(rows,{search='',state='all',filters={},sort='latency',direction='asc'}={}) {
+    const query=search.trim().toLowerCase(),sign=direction==='desc'?-1:1;
+    return rows.filter(row=>{
+      if(query && !['address','country','colo','type','note','ipType'].some(key=>String(resultValue(row,key)).toLowerCase().includes(query)))return false;
+      if(!(state==='all'||state==='ok'&&row.latency!==null||state==='failed'&&row.status.startsWith('失败')||state==='v4'&&row.bits===32||state==='v6'&&row.bits===128||state==='selected'&&row.selected))return false;
+      return Object.entries(filters).every(([key,values])=>!values.length||values.includes(String(resultValue(row,key)||'未知')));
+    }).sort((a,b)=>{
+      const first=resultValue(a,sort),second=resultValue(b,sort),numeric=sort==='latency'||sort==='speed';
+      const missingFirst=first===''||numeric&&!Number.isFinite(first),missingSecond=second===''||numeric&&!Number.isFinite(second);
+      if(missingFirst||missingSecond)return Number(missingFirst)-Number(missingSecond);
+      return sign*(numeric?first-second:String(first).localeCompare(String(second),undefined,{numeric:true}));
+    });
+  }
+  const api={ipNumber,numberIP,parseEntry,candidates,probeURL,ManualRun,download,resultValue,resultRows,init};
   scope.BrclioSpeedtest=api;
   if(scope.document && scope.BrclioUI) init(scope.BrclioUI);
 
@@ -124,18 +141,45 @@
     const page=root.closest('.page');
     if(page)new MutationObserver(()=>{if(page.hidden)for(const r of allRuns)r.stop();}).observe(page,{attributes:true,attributeFilter:['hidden']});
 
-    const net=section('网络与出口信息','仅点击后查询。结果表示此浏览器访问对应服务时的出口，不代表代理客户端已经连通。');
-    const netOut=node('div',undefined,'probe-network-grid');net.append(button('查询网络信息',networkInfo),netOut);
-    async function networkInfo(){const run=runStart();netOut.replaceChildren();try{
+    const net=section('网络与出口信息','仅点击后查询。结果表示此浏览器访问对应服务时的出口，不代表代理客户端已经连通。IP 和地区默认隐藏；查询详情会单独访问公开 IP 数据库。');
+    let networkVisible=false,networkCards=[];
+    const netOut=node('div',undefined,'probe-network-grid');
+    const privacy=button('显示 IP 和地区',()=>{networkVisible=!networkVisible;privacy.textContent=networkVisible?'隐藏 IP 和地区':'显示 IP 和地区';privacy.setAttribute('aria-pressed',String(networkVisible));for(const card of networkCards)renderNetworkCard(card);});
+    privacy.setAttribute('aria-pressed','false');privacy.disabled=true;
+    const queryNetwork=button('查询网络信息',networkInfo);net.append(queryNetwork,privacy,netOut);
+    function renderNetworkCard(card){if(card.result)card.out.textContent=networkVisible?card.result.text:'已获取 · IP 和地区已隐藏';}
+    function networkResult(ip,parts=[]){ip=String(ip||'').trim();try{ipNumber(ip);}catch{throw Error('响应没有有效 IP');}return {ip,text:[ip,...parts].filter(Boolean).join(' · ')};}
+    async function adminProbe(run,path,options={}){
+      if(run.stopped)throw Error('已停止');const controller=new AbortController();run.controllers.add(controller);const timer=setTimeout(()=>controller.abort(),8000);
+      try{return await bridge.api(path,{...options,signal:controller.signal});}finally{clearTimeout(timer);run.controllers.delete(controller);}
+    }
+    async function networkIPDetail(ip){
+      const dialog=node('dialog',undefined,'confirm-dialog ip-detail-dialog');dialog.setAttribute('aria-label','出口 IP 详情');dialog.append(node('h2','出口 IP 详情'));
+      const message=node('p','正在查询公开网络信息…','field-hint'),content=node('dl',undefined,'detail-list'),close=button('关闭详情',()=>dialog.close());dialog.append(message,content,close);document.body.append(dialog);dialog.showModal();
+      const run=runStart();dialog.addEventListener('close',()=>{run.stop();dialog.remove();},{once:true});
+      try{
+        const response=await adminProbe(run,'/admin/ipDetail',{method:'POST',data:{ip}});if(!dialog.open||run.stopped)return;
+        const data=response.data||{},location=data.location||{},asn=data.asn||{},company=data.company||{};
+        const values=[['IP',data.ip||ip],['地区',[location.country,location.state,location.city].filter(Boolean).join(' · ')],['时区',location.timezone],['ASN',asn.asn?'AS'+asn.asn:''],['网络组织',asn.org||asn.descr||company.name],['运营商类型',asn.type||company.type],['网段',asn.route||company.network],['来源',response.source||'https://api.ipapi.is/']];
+        for(const [name,value]of values)if(value!==undefined&&value!==null&&value!=='')content.append(node('dt',name),node('dd',String(value)));
+        for(const [key,name]of [['is_proxy','代理'],['is_vpn','VPN'],['is_tor','Tor'],['is_datacenter','数据中心'],['is_mobile','移动网络'],['is_abuser','滥用标记']])if(typeof data[key]==='boolean')content.append(node('dt',name),node('dd',data[key]?'是':'否'));
+        message.textContent='以下信息来自第三方数据库，仅反映该来源的标记。';
+      }catch(error){if(dialog.open){message.textContent=run.stopped?'查询已停止。':error.message;message.className='inline-error';}}finally{runDone(run);}
+    }
+    async function networkInfo(){const run=runStart();queryNetwork.disabled=true;netOut.replaceChildren();networkCards=[];privacy.disabled=true;try{
       const jobs=[
-        ['当前 Cloudflare 入口',async()=>{const d=await bridge.api('/admin/network');return [d.ip,d.country,d.city,d.colo].filter(Boolean).join(' · ');}],
-        ['海外出口',async()=>{const r=await run.request('https://api.ipapi.is',{},6000);if(!r.ok)throw Error('查询失败');const d=await r.json();if(!d.ip)throw Error('响应没有 IP');return [d.ip,d.cc||d.location?.country_code,d.asn_org||d.asn?.org].filter(Boolean).join(' · ');}],
-        ['国内出口',async()=>{let failure;for(const [url,header]of [['https://perfops2.byte-test.com/500b-bench.jpg','X-Request-Ip'],['https://necaptcha.nosdn.127.net/ab7f4275c1744aa28e0a8f3a1c58c532.png','cdn-user-ip']]){try{const r=await run.request(url,{method:'HEAD'},5000),ip=r.headers.get(header);if(!ip)throw Error('未返回出口 IP');return ip;}catch(e){failure=e;if(run.stopped)throw e;}}throw failure;}],
-        ['X.com 出口',async()=>{const r=await run.request('https://help.x.com/cdn-cgi/trace',{},6000);if(!r.ok)throw Error('查询失败');const d=Object.fromEntries((await r.text()).split('\n').map(x=>x.split('=')));if(!d.ip)throw Error('响应没有 IP');return [d.ip,d.loc,d.colo].filter(Boolean).join(' · ');}],
-        ...[['IPv4','104.16.0.1',32],['IPv6','2606:4700::1111',128]].map(([name,ip,bits])=>[name,async()=>{const r=await run.request(probeURL({ip,bits,port:443},host.value,'ip.json'),{},6000);if(!r.ok)throw Error('查询失败');const d=await r.json();if(!d.ip)throw Error('响应没有 IP');return [d.ip,d.country,d.colo,d.cnIspCode].filter(Boolean).join(' · ');}])
+        ['当前 Cloudflare 入口','当前 Worker /admin/network',async()=>{const d=await adminProbe(run,'/admin/network');return networkResult(d.ip,[d.country,d.city,d.colo]);}],
+        ['海外出口','api.ipapi.is',async()=>{const r=await run.request('https://api.ipapi.is',{},6000);if(!r.ok)throw Error('查询失败');const d=await r.json();return networkResult(d.ip,[d.cc||d.location?.country_code,d.asn_org||d.asn?.org]);}],
+        ['国内出口','字节 / 网易资源响应头',async()=>{let failure;for(const [url,header]of [['https://perfops2.byte-test.com/500b-bench.jpg','X-Request-Ip'],['https://necaptcha.nosdn.127.net/ab7f4275c1744aa28e0a8f3a1c58c532.png','cdn-user-ip']]){try{const r=await run.request(url,{method:'HEAD'},5000);return networkResult(r.headers.get(header));}catch(e){failure=e;if(run.stopped)throw e;}}throw failure;}],
+        ['X.com 出口','help.x.com/cdn-cgi/trace',async()=>{const r=await run.request('https://help.x.com/cdn-cgi/trace',{},6000);if(!r.ok)throw Error('查询失败');const d=Object.fromEntries((await r.text()).split('\n').map(x=>x.split('=')));return networkResult(d.ip,[d.loc,d.colo]);}],
+        ...[['IPv4','104.16.0.1',32],['IPv6','2606:4700::1111',128]].map(([name,ip,bits])=>[name,host.value+' / ip.json',async()=>{const r=await run.request(probeURL({ip,bits,port:443},host.value,'ip.json'),{},6000);if(!r.ok)throw Error('查询失败');const d=await r.json();return networkResult(d.ip,[d.country,d.colo,d.cnIspCode]);}])
       ];
-      await run.pool(jobs,3,async([name,task])=>{const item=node('div',undefined,'context-note');item.append(node('strong',name));const out=node('p','查询中…');item.append(out);netOut.append(item);try{out.textContent=await task();}catch(e){out.textContent=run.stopped?'已停止':'未获取：'+e.message;}});
-    }finally{runDone(run);}}
+      await run.pool(jobs,3,async([name,source,task])=>{
+        const item=node('div',undefined,'context-note'),out=node('p','查询中…'),detail=button('查询 IP 详情',()=>networkIPDetail(card.result.ip));detail.disabled=true;
+        const card={out,detail,result:null};networkCards.push(card);item.append(node('strong',name),out,node('p','来源：'+source,'field-hint'),detail);netOut.append(item);
+        try{const result=await task();if(run.stopped)throw Error('已停止');card.result=result;detail.disabled=false;privacy.disabled=false;renderNetworkCard(card);}catch(e){out.textContent=run.stopped?'已停止':'未获取：'+e.message;}
+      });
+    }finally{queryNetwork.disabled=false;runDone(run);}}
 
     const sites=section('网站延迟测速','测量浏览器发起请求所需时间，包含 DNS / TLS 等开销，不是 ICMP Ping。跨域 opaque 响应不能验证网站 HTTP 状态。');
     const siteInput=node('textarea');siteInput.rows=5;siteInput.className='code-input';siteInput.value='字节抖音 | https://lf3-zlink-tos.ugurl.cn/obj/zebra-public/resource_lmmizj_1632398893.png\n哔哩哔哩 | https://i0.hdslb.com/bfs/face/member/noface.jpg\n腾讯微信 | https://res.wx.qq.com/a/wx_fed/assets/res/NTI4MWU5.ico\n淘宝 | https://img.alicdn.com/imgextra/i2/O1CN01qnQCrN1VkzAWiU4Hs_!!6000000002692-2-tps-33-33.png\nGitHub | https://github.github.io/janky/images/bg_hr.png\nTelegram | https://flora.web.telegram.org/\nX.com | https://abs.twimg.com/favicons/twitter.3.ico\nYouTube | https://www.youtube.com/favicon.ico';
@@ -156,22 +200,29 @@
     const actions=node('div',undefined,'probe-actions');best.append(actions);
     const generate=()=>{if(active)throw Error('请先停止当前测速');for(const field of [count,port])if(!field.checkValidity()){field.reportValidity();return false;}rows=candidates(source.value,Number(count.value),Number(port.value));render();status.textContent='已生成 '+rows.length+' 个候选，尚未测速。';return true;};
     actions.append(button('生成候选',generate),button('开始延迟测速',()=>runRows('latency'),true),button('下载测速 · 选中或全部',()=>runRows('download')));
-    const filter=input('search',''),kind=select([['all','全部结果'],['ok','延迟通过'],['failed','失败'],['v4','仅 IPv4'],['v6','仅 IPv6'],['selected','已选中']]),sort=select([['latency','延迟从低到高'],['speed','速度从高到低'],['address','地址排序'],['country','地区排序']]);
-    filter.placeholder='筛选地址、地区、类型或备注';for(const field of [filter,kind,sort])field.addEventListener('input',render);
-    const filters=node('div',undefined,'field-grid');filters.append(label('搜索结果',filter),label('显示',kind),label('排序',sort));best.append(filters);
+    const filter=input('search',''),kind=select([['all','全部结果'],['ok','延迟通过'],['failed','失败'],['v4','仅 IPv4'],['v6','仅 IPv6'],['selected','已选中']]),sort=select([['latency','延迟'],['speed','下载速度'],['address','地址'],['ipType','IP 类型'],['type','优选类型'],['country','国家 / 地区'],['colo','数据中心']]),direction=select([['asc','升序'],['desc','降序']]);
+    filter.placeholder='筛选地址、地区、类型或备注';
+    const filters=node('div',undefined,'field-grid');filters.append(label('搜索结果',filter),label('显示',kind),label('排序字段',sort),label('排序方向',direction));best.append(filters);
+    const categoryFilters={};
+    for(const [key,title]of [['ipType','IP 类型'],['type','优选类型'],['country','国家 / 地区'],['colo','数据中心']]){
+      const control=select([]);control.multiple=true;control.size=4;control.setAttribute('aria-label',title+'多选筛选');categoryFilters[key]=control;filters.append(label(title+'（可多选，不选表示全部）',control));control.addEventListener('change',()=>{pageIndex=0;render();});
+    }
+    const resetFilters=button('清除全部筛选',()=>{filter.value='';kind.value='all';for(const control of Object.values(categoryFilters))for(const option of control.options)option.selected=false;pageIndex=0;render();});best.append(resetFilters,node('p','各组之间同时满足；同组可选多个值。桌面按住 Ctrl / Command 多选，手机可在选项窗口多选。','field-hint'));
+    function updateCategoryFilters(){for(const [key,control]of Object.entries(categoryFilters)){const values=[...new Set(rows.map(row=>String(resultValue(row,key)||'未知')))].sort((a,b)=>a.localeCompare(b));if(JSON.stringify(values)===control.dataset.values)continue;const selected=new Set([...control.selectedOptions].map(option=>option.value));control.replaceChildren();for(const value of values){const option=node('option',value);option.value=value;option.selected=selected.has(value);control.append(option);}control.dataset.values=JSON.stringify(values);control.disabled=!values.length;}}
+
     const table=node('table',undefined,'data-table'),thead=node('thead'),header=node('tr'),tbody=node('tbody');
     ['选择','地址 / 备注','地区 / 类型','延迟','下载速度','状态','操作'].forEach(x=>header.append(node('th',x)));thead.append(header);table.append(thead,tbody);const wrap=node('div',undefined,'table-wrap');wrap.append(table);best.append(wrap);
     const resultCount=node('p','尚无结果','field-hint');best.append(resultCount);
     let pageIndex=0,renderTimer=null;const pageSize=100;
     const pageLabel=node('span','第 1 页','field-hint'),prevPage=button('上一页',()=>{pageIndex--;render();}),nextPage=button('下一页',()=>{pageIndex++;render();});
     const pagination=node('div',undefined,'probe-actions');pagination.append(prevPage,pageLabel,nextPage);best.append(pagination);
-    for(const field of [filter,kind,sort])field.addEventListener('input',()=>{pageIndex=0;render();});
+    for(const field of [filter,kind,sort,direction])field.addEventListener('input',()=>{pageIndex=0;render();});
     function scheduleRender(){if(renderTimer===null)renderTimer=setTimeout(()=>{renderTimer=null;render();},100);}
     const exportActions=node('div',undefined,'probe-actions');best.append(exportActions);
-    function visible(){return rows.filter(r=>(!filter.value || [r.address,r.country,r.colo,r.type,r.note].join(' ').toLowerCase().includes(filter.value.toLowerCase())) && (kind.value==='all'||kind.value==='ok'&&r.latency!==null||kind.value==='failed'&&r.status.startsWith('失败')||kind.value==='v4'&&r.bits===32||kind.value==='v6'&&r.bits===128||kind.value==='selected'&&r.selected)).sort((a,b)=>sort.value==='speed'?(b.speed??-1)-(a.speed??-1):sort.value==='address'?a.address.localeCompare(b.address):sort.value==='country'?(a.country||'').localeCompare(b.country||''):(a.latency??Infinity)-(b.latency??Infinity));}
+    function visible(){return resultRows(rows,{search:filter.value,state:kind.value,filters:Object.fromEntries(Object.entries(categoryFilters).map(([key,control])=>[key,[...control.selectedOptions].map(option=>option.value)])),sort:sort.value,direction:direction.value});}
     function selectedLines(){return rows.filter(r=>r.selected).map(r=>r.address+'#'+(r.note||['Brclio 优选',r.country,r.latency===null?'':r.latency+'ms'].filter(Boolean).join(' ')));}
     exportActions.append(button('选中当前筛选结果',()=>{for(const r of visible())r.selected=true;render();}),button('反选当前筛选结果',()=>{for(const r of visible())r.selected=!r.selected;render();}),button('取消所有选择',()=>{for(const r of rows)r.selected=false;render();}),button('复制选中地址',()=>bridge.copy(selectedLines().join('\n'))),button('追加选中到地址列表',()=>{const lines=selectedLines();if(!lines.length)throw Error('请先选中地址');bridge.appendAddresses(lines);}),button('导出 CSV',()=>{const quote=value=>'"'+String(value??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';const csv=[['address','country','colo','type','latency_ms','speed_mbps','status','note'],...visible().map(r=>[r.address,r.country,r.colo,r.type,r.latency,r.speed,r.status,r.note])].map(row=>row.map(quote).join(',')).join('\r\n');const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'})),a=node('a');a.href=url;a.download='brclio-speed-results.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}));
-    function render(){if(renderTimer!==null){clearTimeout(renderTimer);renderTimer=null;}const filtered=visible(),pages=Math.max(1,Math.ceil(filtered.length/pageSize));pageIndex=Math.max(0,Math.min(pageIndex,pages-1));prevPage.disabled=pageIndex===0;nextPage.disabled=pageIndex===pages-1;pageLabel.textContent='第 '+(pageIndex+1)+' / '+pages+' 页 · 每页最多 '+pageSize+' 条';tbody.replaceChildren();for(const r of filtered.slice(pageIndex*pageSize,(pageIndex+1)*pageSize)){const tr=node('tr'),check=input('checkbox','');check.checked=r.selected;check.setAttribute('aria-label','选择 '+r.address);check.addEventListener('change',()=>{r.selected=check.checked;resultCount.textContent=visible().length+' / '+rows.length+' 个结果，已选 '+rows.filter(x=>x.selected).length+' 个';});const first=node('td');first.append(check);tr.append(first);const address=node('td',r.address);address.append(node('div',r.note,'field-hint'));tr.append(address,node('td',[r.country,r.colo,r.type].filter(Boolean).join(' · ')||'—'),node('td',r.latency===null?'—':r.latency+' ms'),node('td',r.speed===null?'—':r.speed.toFixed(2)+' Mbps'),node('td',r.status));const action=node('td'),b=button('测速',()=>runRows('download',[r]));b.disabled=!!active;action.append(b);tr.append(action);tbody.append(tr);}resultCount.textContent=visible().length+' / '+rows.length+' 个结果，已选 '+rows.filter(r=>r.selected).length+' 个';}
+    function render(){updateCategoryFilters();if(renderTimer!==null){clearTimeout(renderTimer);renderTimer=null;}const filtered=visible(),pages=Math.max(1,Math.ceil(filtered.length/pageSize));pageIndex=Math.max(0,Math.min(pageIndex,pages-1));prevPage.disabled=pageIndex===0;nextPage.disabled=pageIndex===pages-1;pageLabel.textContent='第 '+(pageIndex+1)+' / '+pages+' 页 · 每页最多 '+pageSize+' 条';tbody.replaceChildren();for(const r of filtered.slice(pageIndex*pageSize,(pageIndex+1)*pageSize)){const tr=node('tr'),check=input('checkbox','');check.checked=r.selected;check.setAttribute('aria-label','选择 '+r.address);check.addEventListener('change',()=>{r.selected=check.checked;resultCount.textContent=visible().length+' / '+rows.length+' 个结果，已选 '+rows.filter(x=>x.selected).length+' 个';});const first=node('td');first.append(check);tr.append(first);const address=node('td',r.address);address.append(node('div',r.note,'field-hint'));tr.append(address,node('td',[r.country,r.colo,r.type].filter(Boolean).join(' · ')||'—'),node('td',r.latency===null?'—':r.latency+' ms'),node('td',r.speed===null?'—':r.speed.toFixed(2)+' Mbps'),node('td',r.status));const action=node('td'),b=button('测速',()=>runRows('download',[r]));b.disabled=!!active;action.append(button('复制地址',()=>bridge.copy(r.address)),b);tr.append(action);tbody.append(tr);}resultCount.textContent=visible().length+' / '+rows.length+' 个结果，已选 '+rows.filter(r=>r.selected).length+' 个';}
     async function runRows(mode,targets){if(active)throw Error('已有一轮测速正在运行，请先停止');for(const f of [count,threads,timeout,port,seconds,megabytes])if(!f.checkValidity()){f.reportValidity();return;}if(!rows.length && !generate())return;probeURL(rows[0],host.value,'ip.json');const selected=rows.filter(r=>r.selected);targets=targets||(mode==='download' && selected.length?selected:rows);const run=runStart();active=run;let completed=0;const service=host.value;try{render();status.textContent='正在'+(mode==='download'?'下载测速':'检测延迟')+'，共 '+targets.length+' 个地址。';await run.pool(targets,mode==='download'?Math.min(4,Number(threads.value)):Number(threads.value),async r=>{r.status='检测中';scheduleRender();try{if(mode==='latency'){const started=performance.now(),response=await run.request(probeURL(r,service,'ip.json'),{},Number(timeout.value));if(!response.ok)throw Error('HTTP '+response.status);const d=await response.json();if(!d||typeof d.ip!=='string')throw Error('测速服务返回格式无效');r.latency=Math.max(1,Math.round(performance.now()-started));r.country=d.country||'未知';r.colo=d.colo||'';r.type=d.cnIspCode||d.ipType||'探测地址';}else{const result=await download(r,service,run,{seconds:Number(seconds.value),bytes:Number(megabytes.value)*1000000},speed=>{r.speed=speed;});r.speed=result.mbps;}r.status=run.stopped?'已停止':'完成';}catch(e){r.status=run.stopped?'已停止':'失败：'+e.message;if(mode==='download')r.speed=null;else r.latency=null;}completed++;status.textContent=(run.stopped?'已停止':'已完成 '+completed+' / '+targets.length)+'；本轮结束后不会继续请求。';scheduleRender();});}finally{active=null;runDone(run);render();}}
     render();
   }

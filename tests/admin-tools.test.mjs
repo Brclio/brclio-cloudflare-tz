@@ -77,6 +77,24 @@ test('administrator tools use explicit requests and controlled outbound HTTP', {
     assert.deepEqual((await response.json()).data, { version: '2026-09-04 16:24:13' });
   });
 
+  await t.test('changelog reads a fixed plain-text source only on request, without forwarding credentials', async () => {
+    const start = outgoing.length;
+    assert.equal((await request('/admin/upstream-changelog?url=https://outside.example')).status, 400);
+    assert.equal((await request('/admin/upstream-changelog', {}, 'POST')).status, 405);
+    assert.equal(outgoing.length, start);
+    const source = 'https://raw.githubusercontent.com/cmliu/edgetunnel/refs/heads/main/CHANGELOG';
+    const content = '2026-09-04\nALPN update\n<script>untrusted text</script>';
+    fixture = entry => { assert.equal(entry.url, source); return { body: content }; };
+    const response = await request('/admin/upstream-changelog');
+    assert.deepEqual(await response.json(), { success: true, source, content });
+    assert.equal(outgoing.at(-1).headers.cookie, undefined);
+    assert.equal(outgoing.at(-1).headers.authorization, undefined);
+    fixture = () => ({ body: ' ' });
+    assert.equal((await request('/admin/upstream-changelog')).status, 502);
+    fixture = () => ({ status: 503, body: 'unavailable' });
+    assert.equal((await request('/admin/upstream-changelog')).status, 502);
+  });
+
   await t.test('converter validation performs one GET /version and checks the actual response', async () => {
     fixture = entry => {
       assert.equal(entry.url, 'https://converter.example/version');

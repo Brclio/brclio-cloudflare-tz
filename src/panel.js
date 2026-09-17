@@ -133,6 +133,10 @@ export function validateConfig(config) {
   if (!['aes-128-gcm', 'aes-256-gcm'].includes(config.SS.加密方式)) return 'Shadowsocks 仅支持 aes-128-gcm 或 aes-256-gcm';
   if (!['gun', 'multi'].includes(config.gRPC模式)) return 'gRPC 模式必须为 gun 或 multi';
   if (![null, 'Shadowrocket', 'Happ'].includes(config.TLS分片)) return '不支持的 TLS 分片模式';
+  if (config.协议类型 === 'ss' && config.传输协议 !== 'ws') return 'Shadowsocks 仅支持 WebSocket 传输';
+  if (config.订阅转换配置.XUDP && !config.订阅转换配置.UDP) return '启用 XUDP 时需要同时启用 UDP';
+  if (config.启用0RTT && (config.协议类型 === 'ss' || config.传输协议 === 'grpc')) return 'Shadowsocks 和 gRPC 不支持 0-RTT';
+  if (config.协议类型 === 'ss' && !config.SS.TLS && (config.ECH || config.TLS分片)) return 'Shadowsocks 关闭 TLS 时不能启用 ECH 或 TLS 分片';
   for (const key of ['ALPN', 'Fingerprint', 'gRPCUserAgent']) if (typeof config[key] !== 'string') return `${key} 必须为文字`;
   if (typeof config.优选订阅生成.SUBNAME !== 'string') return '订阅名称必须为文字';
   const source = config.优选订阅生成.SUB;

@@ -1,19 +1,20 @@
 /*
- * Brclio Edge — modified 2026-09-16 by Brclio.
+ * Brclio Edge — modified 2026-09-17 by Brclio.
  * Based on cmliu/edgetunnel 448a83ced00a43c1d892d5ecbed86a26ea9eeaff.
  * GPL-2.0-only. Original tunnel implementation and contributor credits retained.
  * Changes: local UI, signed sessions, protected mutations, configuration validation,
- * request-scoped config, redacted logs, official Cloudflare TCP connector.
+ * request-scoped config, redacted logs, official Cloudflare TCP connector,
+ * persisted proxy whitelist routing, consistent ALPN in node links.
  * See LICENSE and THIRD_PARTY_NOTICES.md.
  */
 import { connect } from 'cloudflare:sockets';
 import { decodeHunk } from './grpc.js';
 import { handleAdminTool } from './admin-tools.js';
 import { deploymentDownload } from './downloads.js';
+import { DEFAULT_PROXY_WHITELIST, defaultProxyWhitelist, loadProxyWhitelist, matchesProxyWhitelist } from './proxy-whitelist.js';
 import { localAsset, json, redirect, authenticated, login, logout, sameOrigin, saveCredentials, validateConfig, mergeConfig, safeLogURL, panelHeaders } from './panel.js';
 const Version = '2026-09-04 16:24:13';
-let 缓存SOCKS5白名单 = null, 调试日志打印 = false;
-let SOCKS5白名单 = ['*tapecontent.net', '*cloudatacdn.com', '*loadshare.org', '*cdn-centaurus.com', 'scholar.google.com'];
+let 调试日志打印 = false;
 ///////////////////////////////////////////////////////全局常量和工具函数///////////////////////////////////////////////
 const WS早期数据最大字节 = 8 * 1024, WS早期数据最大头长度 = Math.ceil(WS早期数据最大字节 * 4 / 3) + 4;
 const 上行合包目标字节 = 20 * 1024, 上行队列最大字节 = 16 * 1024 * 1024, 上行队列最大条目 = 4096;
@@ -65,10 +66,6 @@ const worker = {
 			默认反代兜底 = false;
 		};
 		const 访问IP = request.headers.get('CF-Connecting-IP') || request.headers.get('True-Client-IP') || request.headers.get('X-Real-IP') || request.headers.get('X-Forwarded-For') || request.headers.get('Fly-Client-IP') || request.headers.get('X-Appengine-Remote-Addr') || request.headers.get('X-Cluster-Client-IP') || '未知IP';
-		if (缓存SOCKS5白名单 === null) {
-			if (env.GO2SOCKS5) SOCKS5白名单 = [...new Set(SOCKS5白名单.concat(await 整理成数组(env.GO2SOCKS5)))];
-			缓存SOCKS5白名单 = SOCKS5白名单;
-		} else SOCKS5白名单 = 缓存SOCKS5白名单;
 		if (访问路径 === 'version') {// 版本信息接口
 			const 请求UUID = (url.searchParams.get('uuid') || '').toLowerCase();
 			if (uuidRegex.test(请求UUID)) {
@@ -84,10 +81,12 @@ const worker = {
 			}
 		} else if (管理员密码 && upgradeHeader === 'websocket') {// WebSocket代理
 			const 反代上下文 = await 反代参数获取(url, userID, 默认反代IP, 默认反代兜底);
+			反代上下文.代理白名单 = await loadProxyWhitelist(env);
 			log(`[WebSocket] 命中请求: ${url.pathname}${url.search}`);
 			return await 处理WS请求(request, userID, url, 反代上下文);
 		} else if (管理员密码 && !访问路径.startsWith('admin/') && 访问路径 !== 'login' && request.method === 'POST') {// gRPC/叉HTTP代理
 			const 反代上下文 = await 反代参数获取(url, userID, 默认反代IP, 默认反代兜底);
+			反代上下文.代理白名单 = await loadProxyWhitelist(env);
 			const { 头: 本机Padding头, 键: 本机Padding键 } = 获取叉HTTPPadding标识(userID);
 			const 命中叉HTTP特征 = !!request.headers.get(本机Padding头) || !!url.searchParams.get(本机Padding键);
 			if (!命中叉HTTP特征 && contentType.startsWith('application/grpc')) {
@@ -132,7 +131,7 @@ const worker = {
                             if (input.port) url.searchParams.set('port', String(input.port));
                         }
                     }
-                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.2', upstreamVersion: Version, kv: true });
+                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.3', upstreamVersion: Version, kv: true });
                     if (request.method === 'POST' && ['admin/cf.json', 'admin/tg.json'].includes(访问路径)) return saveCredentials(request, env, 访问路径 === 'admin/cf.json' ? 'cf' : 'tg');
                     if (访问路径 === 'admin/init' && request.method !== 'POST') return json({ error: '重置配置需要 POST' }, 405, { Allow: 'POST' });
                     if (request.method === 'GET' && 区分大小写访问路径 === 'admin/ADD.txt') {
@@ -2408,7 +2407,7 @@ async function forwardataTCP(host, portNum, rawData, ws, respHeader, remoteConnW
 	}
 	remoteConnWrapper.retryConnect = async () => connecttoPry(!已通过代理发送首包);
 
-	if (ctx代理类型 && (ctx代理全局 || SOCKS5白名单.some(p => new RegExp(`^${p.replace(/\*/g, '.*')}$`, 'i').test(host)))) {
+	if (ctx代理类型 && (ctx代理全局 || matchesProxyWhitelist(host, 反代上下文.代理白名单 ?? DEFAULT_PROXY_WHITELIST))) {
 		log(`[TCP转发] 启用 SOCKS5/HTTP/HTTPS/TURN/SSTP 全局代理`);
 		try {
 			await connecttoPry();
@@ -5631,7 +5630,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 				启用: null,
 				全局: false,
 				账号: '',
-				白名单: SOCKS5白名单,
+				白名单: defaultProxyWhitelist(env),
 			},
 			路径模板: {
 				[_p]: "proxyip=" + 占位符,
@@ -5772,7 +5771,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 	const 传输路径参数值 = 获取传输路径参数值(config_JSON, config_JSON.完整节点路径);
 	config_JSON.LINK = config_JSON.协议类型 === 'ss'
 		? `${config_JSON.协议类型}://${btoa(config_JSON.SS.加密方式 + ':' + userID)}@${host}:${config_JSON.SS.TLS ? '443' : '80'}?plugin=v2${encodeURIComponent(`ray-plugin;mode=websocket;host=${host};path=${((config_JSON.完整节点路径.includes('?') ? config_JSON.完整节点路径.replace('?', '?enc=' + config_JSON.SS.加密方式 + '&') : (config_JSON.完整节点路径 + '?enc=' + config_JSON.SS.加密方式)) + (config_JSON.SS.TLS ? ';tls' : ''))};mux=0`) + ECHLINK参数}#${encodeURIComponent(config_JSON.优选订阅生成.SUBNAME)}`
-		: `${config_JSON.协议类型}://${userID}@${host}:443?security=tls&type=${传输协议 + ECHLINK参数}&${域名字段名}=${host}&fp=${config_JSON.Fingerprint}&sni=${host}&${路径字段名}=${encodeURIComponent(传输路径参数值) + TLS分片参数}&encryption=none#${encodeURIComponent(config_JSON.优选订阅生成.SUBNAME)}`;
+		: `${config_JSON.协议类型}://${userID}@${host}:443?security=tls&type=${传输协议 + ECHLINK参数}&${域名字段名}=${host}&fp=${config_JSON.Fingerprint}&sni=${host}&${路径字段名}=${encodeURIComponent(传输路径参数值) + TLS分片参数}&encryption=none&alpn=${encodeURIComponent(config_JSON.ALPN)}#${encodeURIComponent(config_JSON.优选订阅生成.SUBNAME)}`;
 	config_JSON.优选订阅生成.TOKEN = await MD5MD5(hostname + userID);
 
 	const 初始化TG_JSON = { BotToken: null, ChatID: null };

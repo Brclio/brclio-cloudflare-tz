@@ -43,6 +43,12 @@ test('configuration writes preserve supported wildcard hosts and reject values t
     ['string random-port sentinel', value => { value.优选订阅生成.本地IP库.指定端口 = '-1'; }],
     ['truthy false string', value => { value.优选订阅生成.本地IP库.随机IP = 'false'; }],
     ['unsupported Shadowsocks cipher', value => { value.SS.加密方式 = 'not-supported'; }],
+    ['Shadowsocks over gRPC', value => { value.协议类型 = 'ss'; value.传输协议 = 'grpc'; }],
+    ['XUDP without UDP', value => { value.订阅转换配置.XUDP = true; value.订阅转换配置.UDP = false; }],
+    ['gRPC with early data', value => { value.传输协议 = 'grpc'; value.启用0RTT = true; }],
+    ['Shadowsocks with early data', value => { value.协议类型 = 'ss'; value.启用0RTT = true; }],
+    ['ECH without Shadowsocks TLS', value => { value.协议类型 = 'ss'; value.SS.TLS = false; value.ECH = true; }],
+    ['fragmentation without Shadowsocks TLS', value => { value.协议类型 = 'ss'; value.SS.TLS = false; value.TLS分片 = 'Happ'; }],
     ['missing external subscription source', value => { value.优选订阅生成.local = false; value.优选订阅生成.SUB = null; }],
     ['malformed converter URL', value => { value.订阅转换配置.SUBAPI = 'not-a-url'; }],
   ];

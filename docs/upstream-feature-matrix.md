@@ -1,6 +1,20 @@
 # 上游功能对照矩阵
 
-> 2026-09-15 最终代码对照。下表描述仓库当前实现；**“已实现”不等于所有客户端与第三方服务均已在线验收**。公网部署、真实凭据与客户端验收边界见 [validation.md](validation.md)。
+> 2026-09-17 重新下载实际上游源码与管理页核对；本次修复对应 v1.0.3 源码与部署包。下表描述仓库当前实现；**“已实现”不等于所有客户端与第三方服务均已在线验收**。公网部署、真实凭据与客户端验收边界见 [validation.md](validation.md)。
+
+## 0. 本次补齐与核对结果
+
+本次实际获取的上游 Worker 仍为 `448a83ced00a43c1d892d5ecbed86a26ea9eeaff`，管理页 SHA-256 仍为 `3cb5b5fb00f66fff155105a90ff6d20864e510b33874341b7f6563145b7fdca6`。因此此次重点是补全可发现入口、字段选项、配置联动和失效行为，并非更换隧道内核。
+
+- 新增侧栏「进阶配置」和「我是高手，我要折腾」模式开关；完整 / 简洁视图同步并本地记忆，显式工具跳转会展开对应工具。
+- gRPC / Shadowsocks、TLS / ECH、订阅转换、全部代理路径模板集中在可编辑表单；分组撤销使用同一份配置基线，保留其他组修改。
+- 补齐 `360` / `qq` 指纹及 `h3` ALPN 组合；VLESS / Trojan 单节点链接与订阅均带 ALPN。
+- 补齐 XUDP / UDP、SS / WebSocket、0-RTT、TLS / ECH / 分片的兼容性联动，服务端拒绝对应无效配置组合。加载旧配置时提示冲突，由用户明确修正，不自动写回。
+- **修复此前矩阵遗漏的实际问题：**保存的代理白名单此前未进入转发路由；现在 WS、gRPC、XHTTP 都使用请求自己的 KV 白名单快照，清空生效，保留 `GO2SOCKS5` 强制附加项。仅 `*` 是通配符，其他正则字符按字面匹配。
+- 新增内置上游 CHANGELOG 手动读取、UUID 复制、测速网络隐私显示与 IP 详情、单行地址复制、七个字段双向排序和独立多选筛选。
+- 补充 Cloudflare 部署变量说明；这些变量仍需在 Cloudflare 修改，不显示无法生效的保存按钮。
+
+本地真实 TCP 代理测试、配置持久化与订阅参数测试见 [validation.md](validation.md)。公网客户端、外部转换器、公开代理可用性及通知投递仍按各自外部条件验收。保留手动、有限次测速语义：勾选或筛选不会自动启动测量。
 
 ## 1. 对照对象与证据范围
 
@@ -31,8 +45,8 @@
 | 当前 HOST、UUID、版本展示 | HTML `nodeHost`、`nodeUUID`；`loadVersionByUUID` | 保留 |
 | 多 HOSTS 编辑、环境变量覆盖 | `openHostsEditModal`、Worker `env.HOST` | 已实现字段、配置来源说明、不匹配条件提示条与 24 小时忽略 |
 | 主配置保存、取消修改、重置 | `saveConfig`、`cancelEdit`、`resetConfigWithConfirm` | 保留保存、恢复和重置；本地另有 JSON 导入/导出及离开提醒 |
-| 分区修改状态 | `modifiedSections`、各区保存/取消按钮 | 本地统一配置保存；ADD、CF、TG 独立保存 |
-| 新手 / 高级模式 | `toggleUserMode` | 已实现完整 / 简洁视图，浏览器保存偏好 |
+| 分区修改状态 | `modifiedSections`、各区保存/取消按钮 | 本地统一配置保存，进阶配置支持分组撤销；ADD、CF、TG 独立保存 |
+| 新手 / 高级模式 | `toggleUserMode` | 已实现显眼的「我是高手，我要折腾」开关和完整 / 简洁视图同步，浏览器保存偏好 |
 | 暗色主题 / 低性能适配 | 主题 CSS；`LOW_PERF_STORAGE_KEY` 等 | 已实现日间 / 夜间主题；本地轻量 SVG 和 CSS；不复制上游性能彩蛋 |
 | 单节点链接复制 | `LinkURL`、`copySubscription` | 保留 |
 | 单节点链接二维码 | `showQRCode('LinkURL')` | 已实现本地 SVG 二维码，不向第三方发送链接 |
@@ -64,8 +78,8 @@
 | `PATH` / `env.PATH` | 节点路径和环境变量覆盖 | 保留 |
 | `SS.加密方式` aes-128-gcm / aes-256-gcm | SS AEAD 内核 | 保留 |
 | `SS.TLS` | SS WebSocket TLS 参数 | 已实现开关、部署/HTTP 端口说明和关闭确认；取消或 Esc 保持原值，确认后才标记待保存 |
-| `Fingerprint` | 订阅 fingerprint 参数 | 保留 |
-| `ALPN` | 原版 2026-09-04 新增参数 | 保留 |
+| `Fingerprint` | 订阅 fingerprint 参数 | 保留，补齐 360 / qq；未知已保存值也保留展示 |
+| `ALPN` | 原版 2026-09-04 新增参数 | 补齐 h3 组合，修复单节点 LINK 漏传；订阅和单节点一致 |
 | `TLS分片` Shadowrocket / Happ | 客户端对应参数修正 | 保留 |
 | `跳过证书验证` | 订阅 skip-verify 参数 | 保留；不代表 Worker 自带 TLS 客户端已实现完整证书链校验 |
 | `启用0RTT` / `随机路径` | 早期数据与随机路径构造 | 保留 |
@@ -81,7 +95,7 @@
 | `EXPAND` | **固定 Worker 未实现；远端页面新增** | 已实现布尔校验、默认值和转换 URL 的 expand 参数；属于对固定 Worker 的明确增补 |
 | `反代.PROXYIP` | 自动 / 指定反代出口 | 保留 |
 | `反代.SOCKS5.启用` | 关闭 / socks5 / http / https / turn / sstp | 保留五种上游代理 |
-| `反代.SOCKS5.全局` / `账号` / `白名单` | 全局代理或域名匹配 | 保留 |
+| `反代.SOCKS5.全局` / `账号` / `白名单` | 全局代理或域名匹配 | 修复 KV 白名单生效，按请求快照匹配；环境变量继续强制附加 |
 | `路径模板.PROXYIP` | `{{IP:PORT}}` 替换 | 已实现专属字段与目录预设，保留 {{IP:PORT}} 校验 |
 | SOCKS5 / HTTP / HTTPS / TURN / SSTP 标准与全局路径 | 每类两个模板，共十个 | 十个字段均可编辑；应用预设深合并，不丢掉预设未提供的类型 |
 | `TG.启用` + 独立 `tg.json` | 日志事件通知 | 已实现保存、清除、通知开关与显式 getMe + 测试消息 |
@@ -110,7 +124,7 @@
 | 全部 / 所选批量下载测速 | `startAllSpeedTests`、拖选逻辑 | 已实现选中或全部有限队列；显式按钮替代拖选结束即启动 |
 | 下载测速量与时限 | `__down?bytes=20000000`，10 秒上限 | 已实现每项 1–100 MB、1–30 秒，上限默认 20 MB / 10 秒；结束取消读取 |
 | 结果 IP、端口、colo、国家、网络类型、延迟、Mbps | BestCF 结果表 | 已实现地址/端口、国家、colo、类型、延迟、Mbps 和状态；CSV 保留独立字段 |
-| 结果排序、国家/机房/类型过滤 | BestCF `sort/filter` | 已实现搜索地址/国家/colo/类型/备注，状态与 IP 族筛选，延迟/速度/地址/地区排序 |
+| 结果排序、国家/机房/类型过滤 | BestCF `sort/filter` | 已实现关键词、状态及 IP 族/类型/国家/colo 多选筛选，地址/IP族/类型/国家/colo/延迟/速度七字段双向排序 |
 | 全选、反选、清除选择、保存到 ADD | `saveSelectedResults` | 已实现选中筛选结果、反选、取消全部、复制与追加 ADD |
 | CSV 导出 | BestCF 保存按钮长按导出 | 已实现显式导出当前筛选结果，包含公式前缀转义 |
 | 本地测速工具目录及 UI 类型筛选 | `best-cf-tools.json` | 已实现手动加载原目录、Web UI / GUI / CLI 筛选、名称/作者/平台搜索及独立项目外链；不复制或执行第三方工具代码 |
@@ -147,7 +161,7 @@
 | gRPC 平台开启提示 | `transportGrpcModal` | 已实现折叠说明和 Cloudflare 官方文档链接 |
 | 当前域名不在 HOSTS 的提示 | `hostsMismatchModal` | 已实现非空 HOSTS 与当前 hostname 不匹配时的条件提示条、查看配置及本地 24 小时忽略；不自动改配置或请求网络 |
 | 上游当前 / 最新版本比较 | `fetchLatestOnlineVersionNumber` | 已实现手动读取最新版本，并并列展示集成版本；不自动覆盖项目 |
-| 上游 CHANGELOG 查看 | `loadVersionChangelog` | 提供上游提交记录外链；未内置 CHANGELOG 弹窗 |
+| 上游 CHANGELOG 查看 | `loadVersionChangelog` | 已实现手动读取上游固定 CHANGELOG 地址并在本地展示纯文本，失败可重试；同时保留提交记录外链 |
 | 复制原版 Worker 源码 | `copyLatestWorkerSourceToClipboard` | 已实现复制当前部署的 Brclio 完整源码；刻意不回退为未修改上游源码 |
 | 下载 Pages ZIP | `openLatestPagesZipDownload` | 已实现由当前部署源码生成 ZIP，包含许可证文件 |
 | 隐藏源码混淆复制 | `obfuscateWorkerSourceWithJShaman` | 原版超过免费 512 KiB 门槛会直接复制原源码；当前 Brclio 源码已超限，本地提供当前源码复制和 JShaman 官方外链，不上传服务 |

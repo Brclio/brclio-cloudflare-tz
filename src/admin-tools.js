@@ -14,6 +14,7 @@ const CATALOGS = Object.freeze({
   version: 'https://raw.githubusercontent.com/cmliu/edgetunnel/main/_worker.js',
 });
 const TIMEOUT_MS = 6000;
+const CHANGELOG_SOURCE = 'https://raw.githubusercontent.com/cmliu/edgetunnel/refs/heads/main/CHANGELOG';
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
@@ -167,12 +168,18 @@ async function ipDetail(input) {
 /** Return null for paths / proxy types handled by the tunnel Worker. */
 export async function handleAdminTool(request, env, toolPath) {
   const path = '/' + toolPath.replace(/^\/+/, '').split('?')[0];
-  if (!['/admin/catalog', '/admin/testSubAPI', '/admin/testTelegram', '/admin/check', '/admin/ipDetail'].includes(path)) return null;
+  if (!['/admin/catalog', '/admin/upstream-changelog', '/admin/testSubAPI', '/admin/testTelegram', '/admin/check', '/admin/ipDetail'].includes(path)) return null;
   if (path === '/admin/check' && request.method !== 'POST') return null;
   try {
-    const method = path === '/admin/catalog' ? 'GET' : 'POST';
+    const method = ['/admin/catalog', '/admin/upstream-changelog'].includes(path) ? 'GET' : 'POST';
     if (request.method !== method) return json({ success: false, error: `此接口仅支持 ${method}` }, 405);
     if (path === '/admin/catalog') return await catalog(request);
+    if (path === '/admin/upstream-changelog') {
+      if (new URL(request.url).search) throw new ToolError('更新日志不接受自定义来源');
+      const content = await remoteText(CHANGELOG_SOURCE, {}, 1024 * 1024);
+      if (!content.trim()) throw new ToolError('上游更新日志为空，请稍后重试', 502);
+      return json({ success: true, source: CHANGELOG_SOURCE, content });
+    }
     // The main Worker still needs the original body for other proxy protocols.
     const input = await readInput(path === '/admin/check' ? request.clone() : request);
     if (path === '/admin/testSubAPI') return await testSubAPI(input);
