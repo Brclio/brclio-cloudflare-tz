@@ -55,7 +55,13 @@ async function remoteText(url, options = {}, maxBytes = MAX_RESPONSE_BYTES, time
   try {
     return await Promise.race([deadline, (async () => {
       // Only explicitly constructed headers are forwarded, never browser cookies.
-      const response = await fetch(url, { ...options, signal: controller.signal, redirect: 'error' });
+      // workerd supports only follow/manual. Inspect redirects before consuming
+      // a body so tool requests and Telegram credentials cannot follow Location.
+      const response = await fetch(url, { ...options, signal: controller.signal, redirect: 'manual' });
+      if (response.status >= 300 && response.status < 400) {
+        await response.body?.cancel();
+        throw new ToolError('远端服务返回重定向，已停止请求', 502);
+      }
       if (!response.ok) throw new ToolError(`远端服务返回 HTTP ${response.status}`, 502);
       return readLimited(response, maxBytes);
     })()]);
@@ -118,6 +124,13 @@ async function testTelegram(input, env) {
   let credentials;
   try { credentials = JSON.parse(await env.KV.get('tg.json')); }
   catch { throw new ToolError('请先保存有效的 Telegram 通知配置'); }
+  if (input.useInput === true) {
+    credentials ||= {};
+    for (const key of ['BotToken', 'ChatID']) {
+      if (input[key] != null && (typeof input[key] !== 'string' || input[key].includes('***') || input[key].length > 4096)) throw new ToolError('请输入真实的 Bot Token 和 Chat ID');
+    }
+    credentials = { BotToken: input.BotToken?.trim() || credentials.BotToken, ChatID: input.ChatID?.trim() || credentials.ChatID };
+  }
   const { BotToken, ChatID } = credentials || {};
   if (typeof BotToken !== 'string' || !/^\d{1,20}:[A-Za-z0-9_-]{1,200}$/.test(BotToken) || !['string', 'number'].includes(typeof ChatID) || !String(ChatID).trim() || String(ChatID).length > 256) {
     throw new ToolError('请先保存有效的 Telegram Bot Token 和 Chat ID');
@@ -131,7 +144,7 @@ async function testTelegram(input, env) {
   }, 65536));
   if (sent.ok !== true) throw new ToolError('Telegram 测试消息发送失败，请检查 Chat ID 和机器人权限', 502);
   const username = typeof bot.result.username === 'string' && /^[A-Za-z0-9_]{1,64}$/.test(bot.result.username) ? bot.result.username : undefined;
-  return json({ success: true, sent: true, username, message: 'Telegram 测试消息已发送' });
+  return json({ success: true, sent: true, username, message: input.useInput === true ? '输入凭据已验证，测试消息已发送；尚未保存' : 'Telegram 测试消息已发送' });
 }
 
 async function checkProxyIP(input) {

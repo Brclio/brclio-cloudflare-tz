@@ -403,22 +403,25 @@
   actions(localPanel, loadLocalTools, link('查看目录来源 ↗', 'https://raw.githubusercontent.com/cmliu/cmliu/refs/heads/main/json/best-cf-tools.json'));
   localFilter.addEventListener('change', renderLocalTools); localSearch.addEventListener('input', renderLocalTools);
 
-  // Usage and Bot verification use stored credentials through same-origin POST endpoints.
-  const usagePanel = $('usage-tools'); const usageSummary = make('div', 'usage-summary'); const usageText = make('strong', '', '尚未接入请求量统计'); const usageProgress = make('progress'); usageProgress.max = 100; usageProgress.value = 0; usageProgress.setAttribute('aria-label', '今日请求配额使用比例'); const usageDetail = make('p', 'field-hint'); const countdown = make('p', 'field-hint'); usageSummary.append(usageText, usageProgress, usageDetail, countdown); usagePanel.append(usageSummary);
-  const usageStatus = status(usagePanel, 'usage-check-status');
-  function renderUsage() {
-    const usage = B.getConfig()?.CF?.Usage;
-    if (usage?.success) { const total = Number(usage.total) || 0, max = Number(usage.max) || 100000; usageText.textContent = total.toLocaleString('zh-CN') + ' / ' + max.toLocaleString('zh-CN') + ' 次 · ' + (total / max * 100).toFixed(2) + '%'; usageProgress.value = Math.min(100, total / max * 100); usageDetail.textContent = 'Workers ' + (Number(usage.workers) || 0).toLocaleString('zh-CN') + ' · Pages ' + (Number(usage.pages) || 0).toLocaleString('zh-CN'); }
-    else { usageText.textContent = '尚未取得有效请求量'; usageProgress.value = 0; usageDetail.textContent = '先保存一组 Cloudflare 凭据，再点击验证与刷新。'; }
-  }
-  function updateCountdown() { const now = new Date(), reset = new Date(now); reset.setUTCHours(24, 0, 0, 0); const seconds = Math.floor((reset - now) / 1000); countdown.textContent = '距下一个 UTC 日界线 ' + Math.floor(seconds / 3600) + ' 时 ' + Math.floor(seconds % 3600 / 60) + ' 分；实际配额以 Cloudflare 控制台为准。'; }
-  const refreshUsage = button('验证并刷新用量', 'verify-cloudflare-usage', async () => run(refreshUsage, usageStatus, async () => { const usage = await B.api('/admin/getCloudflareUsage'); B.setUsage(usage); renderUsage(); showStatus(usageStatus, '已使用保存的凭据查询最新用量。'); }));
-  actions(usagePanel, refreshUsage); updateCountdown(); setInterval(updateCountdown, 60000);
+  // Bot verification uses stored credentials through a same-origin POST endpoint.
   const telegramStatus = status($('telegram-tools'), 'telegram-test-status');
   const testTelegram = button('发送一条测试消息', 'test-telegram', async () => {
     if (!await B.confirmAction('发送 Telegram 测试消息？', '使用已保存的 Bot Token 和 Chat ID，向该聊天发送一条配置验证消息。不会开启后续自动通知。', '发送测试消息')) return;
     return run(testTelegram, telegramStatus, async () => { const result = await B.api('/admin/testTelegram', { method: 'POST', data: { sendMessage: true } }); showStatus(telegramStatus, '测试消息已发送。' + (result.username ? ' Bot：@' + result.username : '')); });
   }); actions($('telegram-tools'), testTelegram);
+  const inputTelegramStatus = status($('tg-form'), 'telegram-input-status');
+  const testTelegramInput = button('验证输入并发送测试', 'verify-telegram-input', async () => {
+    const data = { useInput: true, sendMessage: true };
+    for (const key of ['BotToken', 'ChatID']) { const value = $('tg-' + key).value.trim(); if (value) data[key] = value; }
+    if (!data.BotToken && !data.ChatID) { showStatus(inputTelegramStatus, '请填写要验证的新凭据；已保存凭据可用下方测试按钮。', true); return; }
+    if (!await B.confirmAction('验证新 Telegram 凭据并发送测试？', '使用当前输入的 Bot Token 和 Chat ID（留空沿用已保存值）发送一条测试消息。验证不会保存或替换当前配置。', '验证并发送')) return;
+    const controls = [...$('tg-form').querySelectorAll('input, button')]; controls.forEach(node => { node.disabled = true; });
+    try { const result = await B.api('/admin/testTelegram', { method: 'POST', data }); showStatus(inputTelegramStatus, '验证通过，测试消息已发送' + (result.username ? '（@' + result.username + '）' : '') + '。尚未保存，请点击「保存 Bot 配置」应用。'); }
+    catch (error) { showStatus(inputTelegramStatus, '验证失败：' + error.message + ' 当前已保存配置未改变。', true); }
+    finally { controls.forEach(node => { node.disabled = false; }); }
+  });
+  $('tg-form').querySelector('.form-actions').prepend(testTelegramInput);
+  $('tg-form').addEventListener('input', () => { inputTelegramStatus.hidden = true; });
 
   const projectPanel = panel('project-tools', '版本与开源项目', '查看运行中的版本，获取这份 Brclio Worker 的完整源码和 Pages 安装包。', { details: true });
   const versionSummary = make('p', 'field-hint'); projectPanel.append(versionSummary); const versionStatus = status(projectPanel, 'version-check-status');
@@ -442,8 +445,8 @@
   const projectLinks = make('div', 'tool-actions'); projectLinks.append(link('本项目提交记录 ↗', 'https://github.com/Brclio/brclio-cloudflare-tz/commits/main/'), link('上游更新记录 ↗', 'https://github.com/cmliu/edgetunnel/commits/main/'), link('第三方 Snippets 工具 ↗', 'https://github.com/EDT-Pages/EDT.min.js/tree/Snippets'), link('JShaman 第三方代码工具 ↗', 'https://www.jshaman.com/')); projectPanel.append(projectLinks);
   projectPanel.append(make('p', 'field-hint', 'Snippets 属于第三方独立项目，使用其自身源码和许可。这里保留项目入口；Brclio Worker 下载包含本项目全部开源界面。'));
   projectPanel.append(make('p', 'field-hint', 'JShaman 是外部代码处理服务。此入口只打开其网站，不会上传源码、配置或任何凭据。'));
-  window.addEventListener('brclio:config', () => { renderUsage(); renderHostsNotice(); const meta = B.getMeta(); versionSummary.textContent = 'Brclio Edge ' + (meta?.version || '—') + ' · 集成上游 ' + (meta?.upstreamVersion || '—'); });
-  renderUsage(); renderHostsNotice();
+  window.addEventListener('brclio:config', () => { renderHostsNotice(); const meta = B.getMeta(); versionSummary.textContent = 'Brclio Edge ' + (meta?.version || '—') + ' · 集成上游 ' + (meta?.upstreamVersion || '—'); });
+  renderHostsNotice();
   applyMode(mode, { expand: true });
   window.BrclioTools = { showQR };
 })();

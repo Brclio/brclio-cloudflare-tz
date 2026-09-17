@@ -201,6 +201,25 @@
       "publicExplanation": "设置页版本与开源项目已展开；完整显示下载 Worker.js 与下载 Pages ZIP 入口。只展开本地说明，未执行版本检查、复制、下载或访问第三方链接。",
       "safeToPublish": true,
       "processing": "None; untouched PNG produced by Playwright viewport screenshot."
+    },
+    {
+      "file": "original/request-usage.png",
+      "width": 1112,
+      "height": 496,
+      "bytes": 55740,
+      "sha256": "c51e5f7bb04991262d841494a736b09436f6a102a45c0b22fe7b2c049bf7fe4c",
+      "url": "http://127.0.0.1:53226/admin#overview",
+      "pageTitle": "概览 · Brclio Edge",
+      "capturedAt": "2026-09-17T05:27:01.765496+00:00",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "publicExplanation": "v1.0.4 请求用量面板；数值来自本地受控Cloudflare响应，用于说明界面，不是生产账户数据。",
+      "safeToPublish": true,
+      "processing": "None; untouched element PNG produced by Playwright, no resizing or image edits.",
+      "sourceVersion": "1.0.4",
+      "environment": "Local Miniflare fixture only; no production Cloudflare or Telegram access."
     }
   ]
 }

@@ -185,9 +185,9 @@ GET `/admin/cf.json` 不能用于取回这里保存的凭证，它返回当前 C
 
 或者用 `{ "init": true }` 清空这两个字段。`TG.启用` 在主配置中单独保存；清空凭证与开关是不同操作。管理端显示掩码提示时，输入为空应理解为“尚未输入新凭证”，不能用掩码替代真实密钥提交。
 
-### `GET /admin/getCloudflareUsage`
+### `GET/POST /admin/getCloudflareUsage`
 
-原始 query 支持 `Email`、`GlobalAPIKey`、`AccountID`、`APIToken`，命名区分大小写。该形式会把凭证放进 URL，本地新界面应通过适配层使用 POST body 或已保存凭证。
+原版曾通过 query 传递凭据；本地拒绝该方式。GET 使用已保存凭据；POST 以 JSON body 验证未保存输入，且不写 KV。详见 9.3。
 
 响应形状：
 
@@ -349,13 +349,18 @@ query 类型只取以下顺序找到的第一个：`socks5`、`http`、`https`�
 本地用量刷新流程：
 
 ```text
-POST /admin/cf.json  ← 先在 JSON body 中保存一组凭证
+POST /admin/getCloudflareUsage ← 可先验证未保存输入，不写 KV
+POST /admin/cf.json  ← 在 JSON body 中保存一组凭证
 GET  /admin/getCloudflareUsage  ← 读取 KV 中已保存的凭证查询
 ```
 
 **与上游不兼容的安全改动**：`/admin/getCloudflareUsage` 不再读取 query 中的 Email、GlobalAPIKey、AccountID、APIToken 或 UsageAPI。URL 出现这些字段时返回 400，避免密钥进入地址栏、历史记录和访问 URL。新面板无需在刷新请求中再次发送凭证。
 
-自定义 UsageAPI 必须返回如下结构，所有计数必须是非负有限数值，max 必须大于零：
+POST 验证请求示例：`{"mode":"token","AccountID":"账户ID","APIToken":"真实Token"}`。`mode` 为 `token`、`key` 或 `api`，对应 AccountID/APIToken、Email/GlobalAPIKey、UsageAPI。仅选中方式的字段参与查询；留空字段只在已保存方式相同时复用，不跨认证方式混合。验证成功/失败均不写 KV，无效输入为400；查询失败仍可能是200 + success:false。
+
+`config.CF.UsageAPI` 仅返回固定 `********` 标记，不回显可能包含密钥的完整 URL。GraphQL 缺失数据集或无效计数视为失败；有效的两个空数组表示真实零请求。
+
+自定义 UsageAPI 必须返回如下结构，所有计数必须是非负安全整数，max 必须大于零，total 必须等于 pages + workers：
 
 ```json
 { "success": true, "pages": 12, "workers": 34, "total": 46, "max": 100000 }
@@ -440,9 +445,9 @@ GET  /admin/getCloudflareUsage  ← 读取 KV 中已保存的凭证查询
 
 ### 10.4 POST /admin/testTelegram
 
-请求必须为 `{"sendMessage":true}`；没有该明确字段返回 400，不发送消息。
+请求必须包含 `"sendMessage":true`；没有该明确字段返回400，不发送消息。默认 `{"sendMessage":true}` 使用已保存凭据。
 
-服务端从 `KV/tg.json` 读取已保存的 `BotToken` 和 `ChatID`，忽略请求体中另传的凭据。先向官方 `https://api.telegram.org/bot<TOKEN>/getMe` 发起 POST，确认有效机器人后再向 `sendMessage` POST 一条 Brclio 配置验证消息。请求体中的 `chat_id` 取保存值。
+默认从 `KV/tg.json` 读取已保存的 `BotToken` 和 `ChatID`，忽略请求体另传的凭据。显式设置 `useInput:true` 时，可在body传 BotToken/ChatID 验证未保存输入，空字段沿用已保存值；该验证不写KV。先向官方 `https://api.telegram.org/bot<TOKEN>/getMe` 发起 POST，确认有效机器人后再向 `sendMessage` POST 一条 Brclio 配置验证消息。Telegram 请求中的 `chat_id` 取所选验证凭据。
 
 成功：`{"success":true,"sent":true,"username":"example_bot","message":"Telegram 测试消息已发送"}`，`username` 可省略。结果不返回 Bot Token、Chat ID、完整 Telegram 响应或远端错误描述。机器人验证失败时不发送消息。
 

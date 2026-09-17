@@ -1,11 +1,11 @@
 {
   "schemaVersion": 2,
   "output": "docs/tutorial.html",
-  "bytes": 7119372,
-  "sha256": "16f4cec510036274cb5b41b51e5d96e117ddfdca7e0da796db6e8dfec7645f04",
+  "bytes": 7194770,
+  "sha256": "65294f58a1e6c4c7359faf24935b8cd1621d3283edeff7b88a4ca9f27a1d9be1",
   "fontSha256": "40620aafdd4de898ff58d5489d022b2518c9fe3d34dbdd2f05cbf8d459193fdf",
-  "figures": 37,
-  "uniqueImages": 37,
+  "figures": 38,
+  "uniqueImages": 38,
   "originalImages": [
     {
       "file": "original/login.png",
@@ -69,6 +69,13 @@
       "height": 1200,
       "bytes": 168749,
       "sha256": "14617e240a6fd4235dfed750817254a54c830aea41dfaa869e4aa7f01ac1cab4"
+    },
+    {
+      "file": "original/request-usage.png",
+      "width": 1112,
+      "height": 496,
+      "bytes": 55740,
+      "sha256": "c51e5f7bb04991262d841494a736b09436f6a102a45c0b22fe7b2c049bf7fe4c"
     }
   ],
   "annotatedImages": [

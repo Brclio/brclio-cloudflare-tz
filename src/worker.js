@@ -131,7 +131,7 @@ const worker = {
                             if (input.port) url.searchParams.set('port', String(input.port));
                         }
                     }
-                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.3', upstreamVersion: Version, kv: true });
+                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.4', upstreamVersion: Version, kv: true });
                     if (request.method === 'POST' && ['admin/cf.json', 'admin/tg.json'].includes(访问路径)) return saveCredentials(request, env, 访问路径 === 'admin/cf.json' ? 'cf' : 'tg');
                     if (访问路径 === 'admin/init' && request.method !== 'POST') return json({ error: '重置配置需要 POST' }, 405, { Allow: 'POST' });
                     if (request.method === 'GET' && 区分大小写访问路径 === 'admin/ADD.txt') {
@@ -147,11 +147,20 @@ const worker = {
 						try {
 							if ([...url.searchParams.keys()].some(key => ['email', 'globalapikey', 'accountid', 'apitoken', 'usageapi'].includes(key.toLowerCase()))) return json({ error: '请先通过 /admin/cf.json 保存凭据，不要在 URL 中传递密钥' }, 400);
                             const savedCredentials = JSON.parse(await env.KV.get('cf.json') || '{}');
-							const Usage_JSON = await readCloudflareUsage(savedCredentials);
-							return new Response(JSON.stringify(Usage_JSON, null, 2), { status: 200, headers: { 'Content-Type': 'application/json' } });
-						} catch (err) {
-							const errorResponse = { msg: '查询请求量失败，失败原因：' + err.message, error: err.message };
-							return new Response(JSON.stringify(errorResponse, null, 2), { status: 500, headers: { 'Content-Type': 'application/json;charset=utf-8' } });
+							let credentials = savedCredentials;
+							if (request.method === 'POST') {
+								try {
+									const body = await request.text();
+									if (body.length > 24576) throw new Error('Oversized credentials');
+									credentials = usageValidationCredentials(JSON.parse(body), savedCredentials);
+									if (!credentials) return json(emptyCloudflareUsage(), 400);
+								} catch { return json(emptyCloudflareUsage(), 400); }
+							}
+							const Usage_JSON = await readCloudflareUsage(credentials);
+							return json(Usage_JSON);
+						} catch {
+							// Corrupt stored JSON may contain credentials in its parse error.
+							return json(emptyCloudflareUsage());
 						}
 					} else if (区分大小写访问路径 === 'admin/getADDAPI') {// 验证优选API
 						if (url.searchParams.get('url')) {
@@ -5798,6 +5807,9 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 		} else {
 			const CF_JSON = JSON.parse(CF_TXT);
 			if (CF_JSON.UsageAPI) {
+				// An API URL can carry a token anywhere, so expose only a fixed
+				// configured marker, including when its usage request fails.
+				config_JSON.CF.UsageAPI = '********';
 				config_JSON.CF.Usage = await readCloudflareUsage(CF_JSON);
 			} else {
 				config_JSON.CF.Email = CF_JSON.Email ? CF_JSON.Email : null;
@@ -5809,7 +5821,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 			}
 		}
 	} catch (error) {
-		console.error(`读取cf.json出错: ${error.message}`);
+		console.error('读取 Cloudflare 用量配置失败');
 	}
 
 	config_JSON.加载时间 = (performance.now() - 初始化开始时间).toFixed(2) + 'ms';
@@ -6330,11 +6342,37 @@ const USAGE_TIMEOUT_MS = 4000;
 function emptyCloudflareUsage() {
     return { success: false, pages: 0, workers: 0, total: 0, max: 100000 };
 }
+function usageValidationCredentials(input, saved) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    const fieldsByMode = { token: ['AccountID', 'APIToken'], key: ['Email', 'GlobalAPIKey'], api: ['UsageAPI'] };
+    if (!Object.hasOwn(fieldsByMode, input.mode)) return null;
+    const fields = fieldsByMode[input.mode];
+    const savedMode = saved?.UsageAPI ? 'api' : saved?.AccountID && saved?.APIToken ? 'token' : saved?.Email && saved?.GlobalAPIKey ? 'key' : null;
+    const credentials = {};
+    for (const field of fields) {
+        const value = input[field];
+        if (value != null && (typeof value !== 'string' || value.includes('***') || value.length > 4096)) return null;
+        credentials[field] = value?.trim() || (savedMode === input.mode ? saved[field] : null);
+        if (typeof credentials[field] !== 'string' || !credentials[field]) return null;
+    }
+    return credentials;
+}
 function normalizeCloudflareUsage(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value) || value.success !== true) return emptyCloudflareUsage();
-    if (['pages', 'workers', 'total', 'max'].some(key => !Number.isFinite(value[key]) || value[key] < 0) || value.max === 0) return emptyCloudflareUsage();
+    if (['pages', 'workers', 'total', 'max'].some(key => !Number.isSafeInteger(value[key]) || value[key] < 0) || value.max === 0) return emptyCloudflareUsage();
+    if (value.total !== value.pages + value.workers) return emptyCloudflareUsage();
     // Return only the documented counters; do not relay arbitrary response fields.
     return { success: true, pages: value.pages, workers: value.workers, total: value.total, max: value.max };
+}
+function sumCloudflareRequests(rows) {
+    // Missing/partial analytics data is unavailable, not proof of zero usage.
+    // Empty arrays, in contrast, are a valid response for a day with no events.
+    if (!Array.isArray(rows)) throw new Error('Invalid usage dataset');
+    return rows.reduce((total, row) => {
+        const requests = row?.sum?.requests;
+        if (!Number.isSafeInteger(requests) || requests < 0 || !Number.isSafeInteger(total + requests)) throw new Error('Invalid usage count');
+        return total + requests;
+    }, 0);
 }
 async function readCloudflareUsage(credentials) {
     if (!credentials || typeof credentials !== 'object') return emptyCloudflareUsage();
@@ -6350,11 +6388,12 @@ async function readCloudflareUsage(credentials) {
 }
 async function getCloudflareUsage(Email, GlobalAPIKey, AccountID, APIToken) {
 	const API = "https://api.cloudflare.com/client/v4";
-	const sum = (a) => a?.reduce((t, i) => t + (i?.sum?.requests || 0), 0) || 0;
 	const cfg = { "Content-Type": "application/json" };
 
 	try {
-		if (!AccountID && (!Email || !GlobalAPIKey)) return { success: false, pages: 0, workers: 0, total: 0, max: 100000 };
+		const completeToken = typeof AccountID === 'string' && AccountID && typeof APIToken === 'string' && APIToken;
+		const completeKey = typeof Email === 'string' && Email && typeof GlobalAPIKey === 'string' && GlobalAPIKey;
+		if (!completeToken && !completeKey) return emptyCloudflareUsage();
 
 		if (!AccountID) {
 			const r = await fetch(`${API}/accounts`, {
@@ -6364,47 +6403,54 @@ async function getCloudflareUsage(Email, GlobalAPIKey, AccountID, APIToken) {
 			});
 			if (!r.ok) throw new Error(`账户获取失败: ${r.status}`);
 			const d = await r.json();
-			if (!d?.result?.length) throw new Error("未找到账户");
-			const idx = d.result.findIndex(a => a.name?.toLowerCase().startsWith(Email.toLowerCase()));
+			if (d?.success === false || !Array.isArray(d?.result) || !d.result.length) throw new Error("未找到账户");
+			const idx = d.result.findIndex(a => typeof a?.name === 'string' && a.name.toLowerCase().startsWith(Email.toLowerCase()));
 			AccountID = d.result[idx >= 0 ? idx : 0]?.id;
 		}
+		if (typeof AccountID !== 'string' || !AccountID) return emptyCloudflareUsage();
 
-		const now = new Date();
-		now.setUTCHours(0, 0, 0, 0);
-		const hdr = APIToken ? { ...cfg, "Authorization": `Bearer ${APIToken}` } : { ...cfg, "X-AUTH-EMAIL": Email, "X-AUTH-KEY": GlobalAPIKey };
+		const end = new Date();
+		const start = new Date(end);
+		start.setUTCHours(0, 0, 0, 0);
+		const hdr = completeToken ? { ...cfg, "Authorization": `Bearer ${APIToken}` } : { ...cfg, "X-AUTH-EMAIL": Email, "X-AUTH-KEY": GlobalAPIKey };
 
 		const res = await fetch(`${API}/graphql`, {
 			method: "POST",
 			signal: AbortSignal.timeout(USAGE_TIMEOUT_MS),
 			headers: hdr,
 			body: JSON.stringify({
-				query: `query getBillingMetrics($AccountID: String!, $filter: AccountWorkersInvocationsAdaptiveFilter_InputObject) {
+				// Cloudflare's schema uses the lowercase string scalar. Each
+				// dataset has its own filter input type, so share scalar dates.
+				query: `query getBillingMetrics($AccountID: string, $datetimeStart: string, $datetimeEnd: string) {
 					viewer { accounts(filter: {accountTag: $AccountID}) {
-						pagesFunctionsInvocationsAdaptiveGroups(limit: 1000, filter: $filter) { sum { requests } }
-						workersInvocationsAdaptive(limit: 10000, filter: $filter) { sum { requests } }
+						pagesFunctionsInvocationsAdaptiveGroups(limit: 1000, filter: {datetime_geq: $datetimeStart, datetime_leq: $datetimeEnd}) { sum { requests } }
+						workersInvocationsAdaptive(limit: 10000, filter: {datetime_geq: $datetimeStart, datetime_leq: $datetimeEnd}) { sum { requests } }
 					} }
 				}`,
-				variables: { AccountID, filter: { datetime_geq: now.toISOString(), datetime_leq: new Date().toISOString() } }
+				variables: { AccountID, datetimeStart: start.toISOString(), datetimeEnd: end.toISOString() }
 			})
 		});
 
 		if (!res.ok) throw new Error(`查询失败: ${res.status}`);
 		const result = await res.json();
-		if (result.errors?.length) throw new Error(result.errors[0].message);
+		if (result?.errors != null && (!Array.isArray(result.errors) || result.errors.length)) throw new Error('Cloudflare analytics error');
 
-		const acc = result?.data?.viewer?.accounts?.[0];
+		const accounts = result?.data?.viewer?.accounts;
+		const acc = Array.isArray(accounts) && accounts.length === 1 ? accounts[0] : null;
 		if (!acc) throw new Error("未找到账户数据");
 
-		const pages = sum(acc.pagesFunctionsInvocationsAdaptiveGroups);
-		const workers = sum(acc.workersInvocationsAdaptive);
+		const pages = sumCloudflareRequests(acc.pagesFunctionsInvocationsAdaptiveGroups);
+		const workers = sumCloudflareRequests(acc.workersInvocationsAdaptive);
 		const total = pages + workers;
 		const max = 100000;
 		log(`统计结果 - Pages: ${pages}, Workers: ${workers}, 总计: ${total}, 上限: 100000`);
 		return normalizeCloudflareUsage({ success: true, pages, workers, total, max });
 
-	} catch (error) {
-		console.error('获取使用量错误:', error.message);
-		return { success: false, pages: 0, workers: 0, total: 0, max: 100000 };
+	} catch {
+		// Neither an API error nor a fetch exception is safe to echo: both can
+		// include the request's account, headers or custom URL credentials.
+		console.error('获取 Cloudflare 使用量失败');
+		return emptyCloudflareUsage();
 	}
 }
 

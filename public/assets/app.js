@@ -3,6 +3,7 @@
 
 const $ = (id) => document.getElementById(id);
 const state = { config: null, baseline: '', meta: null, logs: [], logsLoaded: false, logPage: 0, addressesBaseline: '', addressesLoaded: false, rawDirty: false, cfDirty: false, tgDirty: false, busy: false, page: 'overview' };
+let cfRevision = 0;
 const pageNames = { overview: '概览', nodes: '节点配置', subscriptions: '订阅管理', speedtest: '测速与优选', routing: '路由与代理', advanced: '进阶配置', logs: '访问日志', settings: '设置' };
 const bindings = [];
 const PAGE_SIZE = 25;
@@ -52,6 +53,36 @@ async function confirmAction(title, message, label = '确认', dangerous = false
   dialog.showModal();
   return new Promise((resolve) => dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true }));
 }
+async function chooseSecurityOption({ id, title, message, choices, cancelValue }) {
+  if (document.querySelector('dialog[open]')) return null;
+  const dialog = el('dialog', 'confirm-dialog'); dialog.id = id;
+  const heading = el('h2', '', title); heading.id = id + '-title';
+  const description = el('p', '', message); description.id = id + '-message';
+  dialog.setAttribute('aria-labelledby', heading.id);
+  dialog.setAttribute('aria-describedby', description.id);
+  const actions = el('div', 'tool-actions');
+  for (const [value, label, primary] of choices) {
+    const button = el('button', 'button' + (primary ? ' button-primary' : ''), label);
+    button.type = 'button'; button.dataset.choice = value;
+    if (value === cancelValue) button.autofocus = true;
+    button.addEventListener('click', () => dialog.close(value));
+    actions.append(button);
+  }
+  dialog.append(el('span', 'small-caps', 'CONNECTION SETTINGS'), heading, description, actions);
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); dialog.close(cancelValue); });
+  dialog.addEventListener('click', (event) => {
+    if (event.target !== dialog) return;
+    const rect = dialog.getBoundingClientRect();
+    if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close(cancelValue);
+  });
+  document.body.append(dialog);
+  const result = new Promise((resolve) => dialog.addEventListener('close', () => {
+    const choice = dialog.returnValue || cancelValue;
+    dialog.remove(); resolve(choice);
+  }, { once: true }));
+  dialog.showModal();
+  return result;
+}
 async function api(path, { method = 'GET', data, text = false, signal } = {}) {
   const requestSignal = signal || (typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(20000) : undefined);
   const options = { method, credentials: 'same-origin', cache: 'no-store', headers: { Accept: text ? 'text/plain' : 'application/json' }, signal: requestSignal };
@@ -100,6 +131,10 @@ function markChanged() {
   updateSaveState(); renderOverview(); renderSubscriptionLinks();
   if (!state.rawDirty) $('raw-config').value = JSON.stringify(state.config, null, 2);
 }
+function syncMetadataText() {
+  // A credentials/usage response must not overwrite an in-progress JSON edit.
+  if (!state.rawDirty) $('raw-config').value = JSON.stringify(state.config, null, 2);
+}
 
 const schema = {
   'node-identity-fields': [
@@ -121,7 +156,7 @@ const schema = {
   ],
   'node-security-fields': [
     { label: '浏览器指纹', path: ['Fingerprint'], type: 'select', options: ['chrome', 'firefox', 'safari', 'ios', 'android', 'edge', '360', 'qq', 'random', 'randomized'] },
-    { label: 'ALPN', path: ['ALPN'], type: 'select', options: [['', '客户端默认'], ['h2,http/1.1', 'h2, http/1.1'], ['h2', 'h2'], ['http/1.1', 'http/1.1'], ['h3', 'h3'], ['h3,h2', 'h3, h2'], ['h3,h2,http/1.1', 'h3, h2, http/1.1']] },
+    { label: 'ALPN', path: ['ALPN'], type: 'select', options: [['', '客户端自动协商'], ['h2,http/1.1', 'h2, http/1.1'], ['h2', 'h2'], ['http/1.1', 'http/1.1'], ['h3', 'h3'], ['h3,h2', 'h3, h2'], ['h3,h2,http/1.1', 'h3, h2, http/1.1']] },
     { label: 'TLS 分片', path: ['TLS分片'], type: 'select', nullable: true, options: [['', '关闭'], ['Shadowrocket', 'Shadowrocket'], ['Happ', 'Happ']], hint: '需要客户端支持对应分片参数。' },
     { label: '跳过证书验证', path: ['跳过证书验证'], type: 'boolean', hint: '关闭时验证证书。仅在明确需要时开启。' },
     { label: '0-RTT', path: ['启用0RTT'], type: 'boolean', hint: '向节点路径加入早期数据参数。' },
@@ -248,13 +283,33 @@ function createField(spec, { value, onChange, separate = false } = {}) {
     if (onChange) onChange(next);
     else {
       const key = spec.path.join('.');
+      if (key === 'ALPN' && next) {
+        const pending = next;
+        // Match upstream: an unconfirmed explicit ALPN falls back to auto.
+        input.value = '';
+        const choice = await chooseSecurityOption({
+          id: 'alpn-choice-dialog', title: '关于 ALPN 协议协商',
+          message: '即将指定 ALPN 为「' + pending + '」。这会改变客户端协商应用层协议的优先级，设置不兼容时可能无法连接。\n\n如果不确定，请使用客户端自动协商。关闭弹窗或按 Esc 也会恢复自动协商；选择后仍需保存配置。',
+          choices: [['confirm', '我了解影响，使用所选 ALPN', true], ['auto', '使用客户端自动协商']], cancelValue: 'auto',
+        });
+        if (!input.isConnected) return;
+        if (choice === null) { syncConfigControls(); return; }
+        next = choice === 'confirm' ? pending : '';
+      }
       const candidateFingerprint = key === 'Fingerprint' ? next : read(['Fingerprint']);
       const enablesECH = key === 'ECH' ? next : key === 'Fingerprint' && read(['ECH']);
       if (enablesECH && !['chrome', 'firefox'].includes(candidateFingerprint)) {
         syncConfigControls();
-        if (!await confirmAction('ECH 需要兼容的浏览器指纹', '上游推荐 ECH 使用 chrome 或 firefox 指纹。继续将切换为 chrome；取消则保留修改前的设置。', '使用 chrome 并继续') || !input.isConnected) return;
-        write(['Fingerprint'], 'chrome');
-        if (key === 'Fingerprint') next = 'chrome';
+        const choice = await chooseSecurityOption({
+          id: 'ech-choice-dialog', title: 'ECH 与浏览器指纹冲突',
+          message: '当前选择的「' + candidateFingerprint + '」指纹不支持 ECH。请选择 chrome 或 firefox 并开启 ECH，或保留此指纹并关闭 ECH。\n\n取消或按 Esc 会保留修改前的设置。选择后仍需保存配置。',
+          choices: [['chrome', '使用 chrome 并开启 ECH', true], ['firefox', '使用 firefox 并开启 ECH'], ['disable', '关闭 ECH'], ['cancel', '取消修改']], cancelValue: 'cancel',
+        });
+        if (!choice || choice === 'cancel' || !input.isConnected) return;
+        write(['ECH'], choice !== 'disable');
+        if (choice !== 'disable') write(['Fingerprint'], choice);
+        if (key === 'Fingerprint' && choice !== 'disable') next = choice;
+        if (key === 'ECH') next = choice !== 'disable';
       }
       write(spec.path, next);
       applyLinkedChanges(key);
@@ -352,6 +407,7 @@ function renderOverview() {
   $('overview-path').textContent = c.完整节点路径 || c.PATH || '/';
   $('overview-security').textContent = (c.协议类型 === 'ss' && !c.SS?.TLS ? 'TLS 关闭' : 'TLS 开启') + ' · ECH ' + (c.ECH ? '开启' : '关闭');
   $('node-status').textContent = isConfigDirty() ? '待保存' : '已读取';
+  window.BrclioUsage?.render();
 }
 function transportName(value) { return ({ ws: 'WebSocket', grpc: 'gRPC', xhttp: 'XHTTP' })[value] || value || '未设置'; }
 function subscriptionURL() {
@@ -409,6 +465,31 @@ const integrations = {
     { id: 'tg-ChatID', label: 'Chat ID', key: 'ChatID', placeholder: '接收通知的聊天 ID' },
   ],
 };
+function cfMode(data = {}) { return data.UsageAPI ? 'custom' : data.GlobalAPIKey || data.Email ? 'global' : 'token'; }
+function cfKeys() { return ({ token: ['AccountID', 'APIToken'], global: ['Email', 'GlobalAPIKey'], custom: ['UsageAPI'] })[$('cf-auth-mode').value] || []; }
+function syncCFMode() {
+  const keys = cfKeys();
+  integrations.cf.forEach(spec => { const input = $(spec.id); input.closest('.field').hidden = !keys.includes(spec.key); input.disabled = !keys.includes(spec.key); });
+  $('cf-auth-help').textContent = $('cf-auth-mode').value === 'token' ? '创建 API Token 时，选择 Account → Account Analytics → Read 权限，并限定为要查询的账户。这里填写该账户的 Account ID。' : $('cf-auth-mode').value === 'global' ? '填写同一 Cloudflare 账户的邮箱与 Global API Key。多个账户时会自动选择匹配账户；指定账户请改用 API Token。' : '填写 HTTPS API 地址。返回 success: true 及数字 workers、pages、total、max；total 应等于 workers + pages，max 为日配额。请求由当前 Worker 发出。';
+}
+async function verifyCFInput() {
+  const data = {};
+  for (const key of cfKeys()) { const value = $('cf-' + key).value.trim(); if (value) data[key] = value; }
+  const status = $('cf-input-status'); status.hidden = false; status.classList.remove('is-error');
+  if (!Object.keys(data).length) { status.textContent = '请先填写要验证的凭据；验证已保存凭据请点击上方「验证并刷新用量」。'; return; }
+  const controls = [...$('cf-form').querySelectorAll('input, select, button')]; controls.forEach(node => { node.disabled = true; });
+  status.textContent = '正在验证输入，尚未保存…';
+  try {
+    data.mode = ({ token: 'token', global: 'key', custom: 'api' })[$('cf-auth-mode').value];
+    const result = await api('/admin/getCloudflareUsage', { method: 'POST', data });
+    if (!window.BrclioUsage.usageModel({ Usage: result }).valid) throw new Error('未返回有效的请求统计。');
+    status.textContent = '验证通过（尚未保存）：Workers ' + prettyNumber(result.workers) + ' · Pages ' + prettyNumber(result.pages) + ' · 总计 ' + prettyNumber(result.total) + '。点击「保存用量配置」后应用。';
+  } catch (error) { status.classList.add('is-error'); status.textContent = '验证失败：' + error.message + ' 当前已保存配置未改变。'; }
+  finally { controls.forEach(node => { node.disabled = false; }); syncCFMode(); }
+}
+$('cf-auth-mode').addEventListener('change', () => { syncCFMode(); $('cf-input-status').hidden = true; });
+$('verify-cf-input').addEventListener('click', verifyCFInput);
+$('cf-form').addEventListener('input', () => { $('cf-input-status').hidden = true; });
 function renderIntegration(kind) {
   const data = state.config[kind.toUpperCase()] || {};
   const container = $(kind + '-fields'); container.replaceChildren();
@@ -418,40 +499,52 @@ function renderIntegration(kind) {
   });
   $(kind + '-status').textContent = kind === 'cf' ? data.Usage?.success ? '已连接' : data.APIToken || data.GlobalAPIKey || data.UsageAPI ? '已配置' : '可选' : data.BotToken ? data.启用 ? '通知已开启' : '已配置 · 通知关闭' : '可选';
   state[kind + 'Dirty'] = false;
+  if (kind === 'cf') { $('cf-auth-mode').value = cfMode(data); syncCFMode(); $('cf-input-status').hidden = true; }
 }
 async function saveIntegration(kind, event) {
   event.preventDefault();
   const form = event.currentTarget;
   const body = {};
-  integrations[kind].forEach((spec) => { const value = $(spec.id).value.trim(); if (value) body[spec.key] = value; });
+  integrations[kind].filter(spec => kind !== 'cf' || cfKeys().includes(spec.key)).forEach((spec) => { const value = $(spec.id).value.trim(); if (value) body[spec.key] = value; });
   if (!Object.keys(body).length) { toast('请填写要更新的凭据；留空的字段会保留。'); return; }
   if (kind === 'cf' && body.UsageAPI && (body.APIToken || body.GlobalAPIKey || body.AccountID || body.Email)) { toast('请选择一种 Cloudflare 认证方式，自定义 API 不与其他凭据同时填写。', true); return; }
   if (kind === 'cf' && (body.APIToken || body.AccountID) && (body.Email || body.GlobalAPIKey)) { toast('请选择 API Token 或 Global API Key 其中一种认证方式。', true); return; }
   const submit = form.querySelector('[type="submit"]'); const initialText = submit.textContent;
   submit.disabled = true; submit.textContent = '正在保存…';
-  form.querySelectorAll('input').forEach((input) => { input.disabled = true; });
+  form.querySelectorAll('input, select, button').forEach((input) => { input.disabled = true; });
   try {
     await api('/admin/' + kind + '.json', { method: 'POST', data: body });
     state[kind + 'Dirty'] = false;
     integrations[kind].forEach((spec) => { $(spec.id).value = ''; if (body[spec.key]) $(spec.id).placeholder = '已配置 · 留空保留，输入新值替换'; });
     $(kind + '-status').textContent = '已保存';
-    toast(kind === 'cf' ? 'Cloudflare 用量配置已保存。刷新概览可更新用量。' : 'Bot 配置已保存。需要通知时，请开启下方开关并保存主配置。');
+    if (kind === 'cf') {
+      cfRevision++;
+      const previous = state.config.CF || {};
+      const keys = body.UsageAPI ? ['UsageAPI'] : body.APIToken || body.AccountID ? ['AccountID', 'APIToken'] : ['Email', 'GlobalAPIKey'];
+      state.config.CF = { Usage: { success: false } };
+      keys.forEach(key => { state.config.CF[key] = body[key] ? '********' : previous[key]; });
+      const baseline = JSON.parse(state.baseline); baseline.CF = clone(state.config.CF); state.baseline = JSON.stringify(baseline);
+      syncMetadataText(); renderIntegration('cf'); renderOverview(); updateSaveState();
+      void window.BrclioUsage?.credentialsChanged();
+    }
+    toast(kind === 'cf' ? 'Cloudflare 用量配置已保存，正在查询最新用量。' : 'Bot 配置已保存。需要通知时，请开启下方开关并保存主配置。');
   } catch (error) { toast(error.message, true); }
-  finally { submit.disabled = false; submit.textContent = initialText; form.querySelectorAll('input').forEach((input) => { input.disabled = false; }); }
+  finally { submit.disabled = false; submit.textContent = initialText; form.querySelectorAll('input, select, button').forEach((input) => { input.disabled = false; }); if (kind === 'cf') syncCFMode(); }
 }
 async function clearIntegration(kind) {
   const name = kind === 'cf' ? 'Cloudflare 用量' : 'Telegram Bot';
   if (!await confirmAction('移除' + name + '配置？', '保存在当前工作空间的凭据将被清除。' + (kind === 'tg' ? '建议同时关闭日志通知。' : ''), '移除配置', true)) return;
-  const button = $('clear-' + kind); button.disabled = true;
+  const form = $(kind + '-form');
+  form.querySelectorAll('input, select, button').forEach(control => { control.disabled = true; });
   try {
     await api('/admin/' + kind + '.json', { method: 'POST', data: { init: true } });
-    if (kind === 'cf') state.config.CF = { Usage: { success: false } };
+    if (kind === 'cf') { cfRevision++; state.config.CF = { Usage: { success: false } }; window.BrclioUsage?.clear(); }
     else state.config.TG = { 启用: state.config.TG?.启用 || false, BotToken: null, ChatID: null };
     // API-owned masked fields are display metadata, not unsaved main edits.
-    const baseline = JSON.parse(state.baseline); baseline[kind.toUpperCase()] = clone(state.config[kind.toUpperCase()]); state.baseline = JSON.stringify(baseline);
-    renderIntegration(kind); renderOverview(); updateSaveState(); toast(name + '配置已移除。');
+    const baseline = JSON.parse(state.baseline); const metadata = clone(state.config[kind.toUpperCase()]); if (kind === 'tg') metadata.启用 = baseline.TG?.启用 || false; baseline[kind.toUpperCase()] = metadata; state.baseline = JSON.stringify(baseline);
+    syncMetadataText(); renderIntegration(kind); renderOverview(); updateSaveState(); toast(name + '配置已移除。');
   } catch (error) { toast(error.message, true); }
-  finally { button.disabled = false; }
+  finally { form.querySelectorAll('input, select, button').forEach(control => { control.disabled = false; }); if (kind === 'cf') syncCFMode(); }
 }
 
 function logType(item) { return item.TYPE || item.type || '其他'; }
@@ -521,6 +614,7 @@ async function loadAddresses() {
   updateSaveState();
 }
 async function loadWorkspace({ preserveSeparate = false } = {}) {
+  const requestedAt = Date.now(), requestedCFRevision = cfRevision;
   if (!state.config) $('loading-panel').hidden = false;
   $('global-error').hidden = true; $('refresh-config').disabled = true;
   try {
@@ -528,6 +622,10 @@ async function loadWorkspace({ preserveSeparate = false } = {}) {
     if (results[0].status !== 'fulfilled') throw results[0].reason;
     const value = results[0].value;
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('配置不是有效的 JSON 对象。');
+    // A slow configuration query can contain usage from before credentials
+    // were changed/cleared. Keep the newer metadata and its refresh state.
+    const preserveUsage = requestedCFRevision !== cfRevision;
+    if (preserveUsage) value.CF = clone(state.config?.CF || {});
     state.config = clone(value); state.baseline = JSON.stringify(value); state.rawDirty = false;
     if (results[1].status === 'fulfilled') state.meta = results[1].value;
     renderFields(); renderOverview(); renderSubscriptionLinks();
@@ -535,7 +633,7 @@ async function loadWorkspace({ preserveSeparate = false } = {}) {
     $('loading-panel').hidden = true; $('app-content').hidden = false;
     $('last-refreshed').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
     updateSaveState();
-    window.dispatchEvent(new CustomEvent('brclio:config'));
+    window.dispatchEvent(new CustomEvent('brclio:config', { detail: { requestedAt, preserveUsage } }));
     if (!preserveSeparate) await Promise.allSettled([loadAddresses(), loadLogs()]);
     return true;
   } catch (error) {
@@ -566,6 +664,10 @@ function applyRaw({ notify = true } = {}) {
     const value = JSON.parse($('raw-config').value);
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('顶层必须是 JSON 对象。');
     for (const key of ['优选订阅生成', '订阅转换配置', '反代']) if (!value[key] || typeof value[key] !== 'object' || Array.isArray(value[key])) throw new Error('缺少对象字段：' + key);
+    // Credentials and usage are API-owned metadata, never imported from a
+    // stale editor/backup snapshot. The Telegram enable flag remains editable.
+    value.CF = clone(state.config?.CF || {});
+    value.TG = { ...value.TG, BotToken: state.config?.TG?.BotToken ?? null, ChatID: state.config?.TG?.ChatID ?? null };
     state.config = value; state.rawDirty = false; renderFields(); renderOverview(); renderSubscriptionLinks(); updateSaveState();
     if (notify) toast('JSON 已应用到表单，请点击顶部保存配置。');
     return true;
@@ -700,7 +802,7 @@ window.BrclioUI = {
   appendAddresses, navigate, toast, getConfig: () => state.config, getMeta: () => state.meta, read, write, api, copy, confirmAction,
   markChanged, renderFields, renderOverview, downloadFile,
   setField: (path, value) => { write(path, value); renderFields(); markChanged(); },
-  setUsage: (usage) => { state.config.CF ||= {}; state.config.CF.Usage = usage; const baseline = JSON.parse(state.baseline); baseline.CF ||= {}; baseline.CF.Usage = clone(usage); state.baseline = JSON.stringify(baseline); renderOverview(); updateSaveState(); },
+  setUsage: (usage, sampledAt = Date.now()) => { state.config.CF ||= {}; state.config.CF.Usage = usage; const baseline = JSON.parse(state.baseline); baseline.CF ||= {}; baseline.CF.Usage = clone(usage); state.baseline = JSON.stringify(baseline); syncMetadataText(); renderOverview(); updateSaveState(); $('cf-status').textContent = usage.success ? '已连接' : '已配置'; window.dispatchEvent(new CustomEvent('brclio:usage', { detail: { sampledAt } })); },
 };
 navigate(location.hash.slice(1), { hash: false });
 loadWorkspace();

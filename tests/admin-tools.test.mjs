@@ -129,6 +129,26 @@ test('administrator tools use explicit requests and controlled outbound HTTP', {
     assert.equal(outgoing.length - start, 2);
   });
 
+  await t.test('Telegram input verification uses candidate credentials without changing stored credentials', async () => {
+    const before = saved.get('tg.json');
+    const token = '456:NEW_FIXTURE_TOKEN';
+    fixture = entry => {
+      assert.ok(entry.url.startsWith(`https://api.telegram.org/bot${token}/`));
+      if (entry.url.endsWith('/getMe')) return { body: { ok: true, result: { is_bot: true, username: 'candidate_bot' } } };
+      assert.equal(JSON.parse(entry.body).chat_id, '-1007654321');
+      return { body: { ok: true } };
+    };
+    const response = await request('/admin/testTelegram', { useInput: true, sendMessage: true, BotToken: token, ChatID: '-1007654321' });
+    assert.equal(response.status, 200); assert.equal((await response.json()).sent, true); assert.equal(saved.get('tg.json'), before);
+    const start = outgoing.length;
+    assert.equal((await request('/admin/testTelegram', { useInput: true, BotToken: token, ChatID: '-1007654321' })).status, 400);
+    assert.equal((await request('/admin/testTelegram', { useInput: true, sendMessage: true, BotToken: '********' })).status, 400);
+    assert.equal(outgoing.length, start);
+    fixture = () => ({ body: { ok: false, description: token } });
+    const failure = await request('/admin/testTelegram', { useInput: true, sendMessage: true, BotToken: token, ChatID: '-1007654321' });
+    assert.equal(failure.status, 502); assert.equal((await failure.text()).includes(token), false); assert.equal(saved.get('tg.json'), before);
+  });
+
   await t.test('Telegram failures do not send messages or echo remote descriptions containing credentials', async () => {
     const start = outgoing.length;
     fixture = () => ({ body: { ok: false, description: 'FAKE_FIXTURE_TOKEN and private chat id' } });

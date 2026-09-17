@@ -1,8 +1,19 @@
 # 上游功能对照矩阵
 
-> 2026-09-17 重新下载实际上游源码与管理页核对；本次修复对应 v1.0.3 源码与部署包。下表描述仓库当前实现；**“已实现”不等于所有客户端与第三方服务均已在线验收**。公网部署、真实凭据与客户端验收边界见 [validation.md](validation.md)。
+> 2026-09-17 重新下载实际上游源码与管理页核对；当前对应 v1.0.4 源码与部署包。下表描述仓库当前实现；**“已实现”不等于所有客户端与第三方服务均已在线验收**。公网部署、真实凭据与客户端验收边界见 [validation.md](validation.md)。
 
-## 0. 本次补齐与核对结果
+## 0. v1.0.4 在线页面重新核对
+
+2026-09-17 再次访问用户指定的 `https://edt-pages.github.io/admin/`；`/admin` 返回 301 跳转至此，两者最终 HTML 均为 886,073 字节，SHA-256 均为 `3cb5b5fb00f66fff155105a90ff6d20864e510b33874341b7f6563145b7fdca6`。页面与上次抓取一致，但此前矩阵把“存在用量接口和设置页简表”记作完整首页功能，粒度不足；本次纠正并补齐：
+
+- 概览独立 Workers/Pages 用量面板、两色分段条、总量/百分比、分类计数与日配额参考、北京时间 08:00 的时分秒倒计时、折叠记忆。
+- 三选一认证方式、Account Analytics → Read 说明、未保存凭据的同源 POST 验证、保存后自动查询；自定义 API 仅回传固定掩码。
+- 明确区分未配置、失败、真实零、超额和跨日旧数据；倒计时只更新文本，不轮询。修复缺失 GraphQL 数据被当作成功零值、旧响应覆盖新凭据和 JSON 恢复旧用量等问题。
+- ALPN 确认/自动协商、ECH chrome/firefox/关闭三选、Telegram 新凭据确认后发送测试（不保存），以及 TOKEN/UUID/地址/ECH/ProxyIP/用量六类就近帮助。
+
+以下继续记录协议与主要工具能力；不把外部工具、界面装饰或特意保留的安全差异宣称为逐字一致。管理工具使用 workerd 支持的 manual 重定向策略，并显式拒绝3xx；该路径新增真实构建 Worker 集成验证。
+
+## 1.0.3 已完成的进阶配置补齐
 
 本次实际获取的上游 Worker 仍为 `448a83ced00a43c1d892d5ecbed86a26ea9eeaff`，管理页 SHA-256 仍为 `3cb5b5fb00f66fff155105a90ff6d20864e510b33874341b7f6563145b7fdca6`。因此此次重点是补全可发现入口、字段选项、配置联动和失效行为，并非更换隧道内核。
 
@@ -79,11 +90,11 @@
 | `SS.加密方式` aes-128-gcm / aes-256-gcm | SS AEAD 内核 | 保留 |
 | `SS.TLS` | SS WebSocket TLS 参数 | 已实现开关、部署/HTTP 端口说明和关闭确认；取消或 Esc 保持原值，确认后才标记待保存 |
 | `Fingerprint` | 订阅 fingerprint 参数 | 保留，补齐 360 / qq；未知已保存值也保留展示 |
-| `ALPN` | 原版 2026-09-04 新增参数 | 补齐 h3 组合，修复单节点 LINK 漏传；订阅和单节点一致 |
+| `ALPN` | 原版 2026-09-04 新增参数 | 补齐h3组合、单节点LINK；非空ALPN先确认，取消恢复自动协商 |
 | `TLS分片` Shadowrocket / Happ | 客户端对应参数修正 | 保留 |
 | `跳过证书验证` | 订阅 skip-verify 参数 | 保留；不代表 Worker 自带 TLS 客户端已实现完整证书链校验 |
 | `启用0RTT` / `随机路径` | 早期数据与随机路径构造 | 保留 |
-| `ECH` / `ECHConfig.DNS` / `ECHConfig.SNI` | DoH / HTTPS RR 解析和客户端配置 | 已实现开关、自定义字段与原版 DNS / SNI 建议值 |
+| `ECH` / `ECHConfig.DNS` / `ECHConfig.SNI` | DoH / HTTPS RR 解析和客户端配置 | 已实现开关、DNS/SNI建议、自定义字段；冲突提供chrome/firefox/关闭ECH选择，取消保留旧状态 |
 | `优选订阅生成.local` | 本地 / 外部来源开关 | 保留 |
 | `本地IP库.随机IP` / `随机数量` / `指定端口` | 随机与自定义分支 | 保留 |
 | `SUB` / `SUBNAME` / `SUBUpdateTime` / `TOKEN` | 来源、标题、更新时间、鉴权 | 保留；TOKEN 为计算值 |
@@ -152,12 +163,12 @@
 
 | 功能 | 原版实现 | 当前本地状态 / 边界 |
 | --- | --- | --- |
-| Workers / Pages / 总量 / 配额 | CF 用量模块 | 已实现计数、配额比例和 UTC 日界线倒计时；时钟刷新不发网络请求 |
-| CF 凭据验证 / 保存 / 清除 | `testCloudflareConfig` | 已实现；手动验证使用先前保存的凭据，不把凭据放 query |
-| TG 凭据验证 / 测试通知 / 保存 / 清除 | `testTelegramConfig` | 已实现；发送前明确确认，仅读保存凭据，不自动开启通知 |
+| Workers / Pages / 总量 / 配额 | CF 用量模块 | 概览与设置均有独立面板、Workers/Pages 两色分段、三项计数、百分比、时分秒与北京时间08:00说明；折叠记忆；区分失败/零/跨日/超额；时钟不发请求 |
+| CF 凭据验证 / 保存 / 清除 | `testCloudflareConfig` | 三种认证方式选择；GET刷新已保存凭据，POST验证未保存输入且不写KV；不把凭据放query |
+| TG 凭据验证 / 测试通知 / 保存 / 清除 | `testTelegramConfig` | 支持已保存凭据与未保存输入验证；发送前明确确认，未保存验证不写KV，不自动开启通知 |
 | 最近 / 全部日志 | `openLogsModal` | 保留；本地新增搜索、类型过滤、分页和详情 |
 | TOKEN / UUID / 自定义 ADD 写法帮助 | `showAuthTokenHelpModal` | 配置和教程提供说明；原版独立帮助弹窗及长篇内容未照搬 |
-| ProxyIP 用途、ECH 原理/使用/验证帮助 | `proxyIPHelpModal`、`echHelpModal` | 本地有字段说明与 ECH/gRPC/证书折叠帮助；没有逐字复制原三页帮助 |
+| ProxyIP 用途、ECH 原理/使用/验证帮助 | `proxyIPHelpModal`、`echHelpModal` | 新增就近帮助入口、目录弹窗及入口/反代/上游路由图；ECH说明DNS/SNI/指纹/客户端条件，原创内容不逐字复制 |
 | gRPC 平台开启提示 | `transportGrpcModal` | 已实现折叠说明和 Cloudflare 官方文档链接 |
 | 当前域名不在 HOSTS 的提示 | `hostsMismatchModal` | 已实现非空 HOSTS 与当前 hostname 不匹配时的条件提示条、查看配置及本地 24 小时忽略；不自动改配置或请求网络 |
 | 上游当前 / 最新版本比较 | `fetchLatestOnlineVersionNumber` | 已实现手动读取最新版本，并并列展示集成版本；不自动覆盖项目 |
@@ -196,7 +207,7 @@ HOSTS 条件提示和 SS TLS 确认撤销已通过代码与语法核对；最终
 | `GET /admin/cf.json` | 返回 request.cf 元数据 | 保留；不返回存储凭据 |
 | `POST /admin/tg.json` | TG 凭据保存/清除 | 保留 |
 | `GET/POST /admin/ADD.txt` | 自定义列表 | 保留读写；空库 GET 返回空串 |
-| `/admin/getCloudflareUsage` | CF / UsageAPI 计数 | 保留；读已保存凭据；含 URL 密钥返回 400 |
+| `/admin/getCloudflareUsage` | CF / UsageAPI 计数 | GET读已保存凭据、POST验证指定认证方式输入；含URL密钥返回400 |
 | `/admin/getADDAPI` | 下载/解析优选和订阅源 | 保留；已增加 POST body 入口 |
 | `/admin/check` | 五类代理连通检查 | 保留；已增加 POST，ProxyIP 单独工具模块 |
 | `/sub` + format / 客户端识别 | 节点订阅、转换、内容修正 | 保留 |
@@ -209,7 +220,7 @@ HOSTS 条件提示和 SS TLS 确认撤销已通过代码与语法核对；最终
 | `GET /admin/download/worker.js` / `pages.zip` | 原版下载上游源码或归档 | 已实现当前部署源码和带许可证的 Pages ZIP |
 | `GET /admin/catalog?kind=…` | 原版浏览器直取目录 | 已新增受鉴权、固定来源目录接口 |
 | `POST /admin/testSubAPI` | 原版浏览器 GET `/version` | 已新增；返回真实版本识别结果 |
-| `POST /admin/testTelegram` | 原版浏览器 getMe + sendMessage | 已新增；仅读 KV，必须 `sendMessage:true` |
+| `POST /admin/testTelegram` | 原版浏览器 getMe + sendMessage | 已新增；默认读KV，`useInput:true`验证候选输入；必须`sendMessage:true` |
 | `POST /admin/ipDetail` | 原版浏览器请求 IP 详情 | 已新增；只接收 IPv4/IPv6 字面量，固定查询 api.ipapi.is |
 
 完整原始字段和兼容差异另见 [api-contract.md](api-contract.md)；结构、安全边界和外部依赖另见 [architecture.md](architecture.md)。
