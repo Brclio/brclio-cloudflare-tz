@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 2,
+  "output": "docs/github-deploy.html",
+  "bytes": 916548,
+  "sha256": "d62518e3a5c26fed9b1019fa666cd0ad2c5e10cfc03253483f27092727310c00",
+  "fontSha256": "40620aafdd4de898ff58d5489d022b2518c9fe3d34dbdd2f05cbf8d459193fdf",
+  "figures": 4,
+  "uniqueImages": 4,
+  "originalImages": [],
+  "annotatedImages": [
+    {
+      "file": "cloudflare/cf-05.png",
+      "width": 1165,
+      "height": 1107,
+      "bytes": 87776,
+      "sha256": "523926ad23b166695d53ff3f8ca8e4e94fb3a8e0880da33c9ad5cb43f88a2772"
+    },
+    {
+      "file": "cloudflare/cf-06.png",
+      "width": 1198,
+      "height": 724,
+      "bytes": 75505,
+      "sha256": "a901bc4247cc095fdde820d61fc8c61d5f66cd166cf19ffe5f205219e32601ec"
+    },
+    {
+      "file": "cloudflare/cf-12.png",
+      "width": 3400,
+      "height": 1469,
+      "bytes": 163986,
+      "sha256": "e13a5ee8f2fc07de21209ffdd3fc404b41c972ac06c9fb6a714dd773cfb75239"
+    },
+    {
+      "file": "cloudflare/cf-17.png",
+      "width": 802,
+      "height": 1331,
+      "bytes": 112998,
+      "sha256": "69e9d175ed4c6476ea05ffe0413f1d092945021d8c83c90ba9d7298f79303cae"
+    }
+  ],
+  "sourceFiles": [
+    "docs/tutorial-src/github.html",
+    "docs/tutorial-src/styles.css",
+    "docs/tutorial-src/app.js",
+    "scripts/build-tutorial.mjs"
+  ],
+  "selfContained": true,
+  "screenshotProcessing": "Local application PNGs unchanged. User Cloudflare screenshots cropped at native scale, credentials removed and instructional annotations added before embedding. See cloudflare-captures.json."
+}

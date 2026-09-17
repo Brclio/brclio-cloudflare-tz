@@ -1,10 +1,11 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "output": "docs/tutorial.html",
-  "bytes": 2342707,
-  "sha256": "b4e624321bf45a1966bfc30169551849721f811ee6d19678cb67a93cdc2e6aad",
-  "fontSha256": "41d25455976b8d3509a5a608e2d99a6e9524378da3620786cab20987ed863fc0",
-  "figures": 9,
+  "bytes": 7118913,
+  "sha256": "72e106532219c72fb9bab023a760fdf0bf0929963c508dd44909c868c7888ac2",
+  "fontSha256": "40620aafdd4de898ff58d5489d022b2518c9fe3d34dbdd2f05cbf8d459193fdf",
+  "figures": 37,
+  "uniqueImages": 37,
   "originalImages": [
     {
       "file": "original/login.png",
@@ -70,6 +71,204 @@
       "sha256": "14617e240a6fd4235dfed750817254a54c830aea41dfaa869e4aa7f01ac1cab4"
     }
   ],
+  "annotatedImages": [
+    {
+      "file": "cloudflare/cf-01.png",
+      "width": 4125,
+      "height": 1729,
+      "bytes": 239558,
+      "sha256": "270e008e4aedc2a48fe1ef1391d436f56246641a8ca1f2be6d39aa651f08e9c0"
+    },
+    {
+      "file": "cloudflare/cf-02.png",
+      "width": 805,
+      "height": 832,
+      "bytes": 67950,
+      "sha256": "2a54de97752fda3fe102d1271281cd4ad77707f452d38ee3be1632cb3b9dbd8b"
+    },
+    {
+      "file": "cloudflare/cf-03.png",
+      "width": 2695,
+      "height": 990,
+      "bytes": 102129,
+      "sha256": "f4cf51117c9eea734104e5151625d73f68984969b3d0ddade8bd0611eadeeab5"
+    },
+    {
+      "file": "cloudflare/cf-04.png",
+      "width": 3610,
+      "height": 1317,
+      "bytes": 176024,
+      "sha256": "51ac27468817e29ff791027ce778d0dda34f5bb275cda73d3d15ac38b23c6365"
+    },
+    {
+      "file": "cloudflare/cf-05.png",
+      "width": 1165,
+      "height": 1107,
+      "bytes": 87776,
+      "sha256": "523926ad23b166695d53ff3f8ca8e4e94fb3a8e0880da33c9ad5cb43f88a2772"
+    },
+    {
+      "file": "cloudflare/cf-06.png",
+      "width": 1198,
+      "height": 724,
+      "bytes": 75505,
+      "sha256": "a901bc4247cc095fdde820d61fc8c61d5f66cd166cf19ffe5f205219e32601ec"
+    },
+    {
+      "file": "cloudflare/cf-07.png",
+      "width": 2420,
+      "height": 892,
+      "bytes": 103529,
+      "sha256": "c75af32923941c63b040eeb5f14e6f14d16ee4e65c8e035913cbd29377562625"
+    },
+    {
+      "file": "cloudflare/cf-08.png",
+      "width": 2425,
+      "height": 1083,
+      "bytes": 80700,
+      "sha256": "80490289d3f2c097f848a3139075d9fff0154feff029b4067d424eb4f9e0760d"
+    },
+    {
+      "file": "cloudflare/cf-09.png",
+      "width": 2415,
+      "height": 1666,
+      "bytes": 156814,
+      "sha256": "c7c04fb1a9848410c3e30ce24d373636fc5b4f3afe26625d147e0adcfacdb9eb"
+    },
+    {
+      "file": "cloudflare/cf-10.png",
+      "width": 2415,
+      "height": 1844,
+      "bytes": 162639,
+      "sha256": "a2b5acdb1f0f8bbb6ba91799c1ad5bd0337e50820a5fe7456ca2af4b6a377519"
+    },
+    {
+      "file": "cloudflare/cf-11.png",
+      "width": 3505,
+      "height": 1284,
+      "bytes": 137249,
+      "sha256": "764c419cfe00677a78af7dbe1b15494c7cd202de39fbcd0a5c4f980514b1fe0a"
+    },
+    {
+      "file": "cloudflare/cf-12.png",
+      "width": 3400,
+      "height": 1469,
+      "bytes": 163986,
+      "sha256": "e13a5ee8f2fc07de21209ffdd3fc404b41c972ac06c9fb6a714dd773cfb75239"
+    },
+    {
+      "file": "cloudflare/cf-13.png",
+      "width": 1045,
+      "height": 1611,
+      "bytes": 134810,
+      "sha256": "f836b860d5b5172e0cf0adac119354b7002480617209a9535350a341e796e650"
+    },
+    {
+      "file": "cloudflare/cf-14.png",
+      "width": 1045,
+      "height": 1611,
+      "bytes": 114109,
+      "sha256": "be90e6359b885b2f962dbc86603d8c990af372d113cb1aa9721213582c7d97c6"
+    },
+    {
+      "file": "cloudflare/cf-15.png",
+      "width": 1720,
+      "height": 949,
+      "bytes": 97119,
+      "sha256": "1835e2c689516d7c79febc3f82d2c39323ae7fbb92abbac7b77e4bbba33af85a"
+    },
+    {
+      "file": "cloudflare/cf-16.png",
+      "width": 802,
+      "height": 1030,
+      "bytes": 74204,
+      "sha256": "945286d67091a0f511ac64dfb9aa62432cdc7e962a071b718a4635c936aaa77d"
+    },
+    {
+      "file": "cloudflare/cf-17.png",
+      "width": 802,
+      "height": 1331,
+      "bytes": 112998,
+      "sha256": "69e9d175ed4c6476ea05ffe0413f1d092945021d8c83c90ba9d7298f79303cae"
+    },
+    {
+      "file": "cloudflare/cf-18.png",
+      "width": 3508,
+      "height": 1274,
+      "bytes": 139282,
+      "sha256": "b97f4002137e12d7f8931f74e9cb92c5ebe09dd38e15a2511303101ba2183177"
+    },
+    {
+      "file": "cloudflare/cf-19.png",
+      "width": 1845,
+      "height": 1129,
+      "bytes": 91963,
+      "sha256": "776581cf1c265bac04c9669a8a679257c195fda61b8b7e39621e8490007afc15"
+    },
+    {
+      "file": "cloudflare/cf-20.png",
+      "width": 1828,
+      "height": 1535,
+      "bytes": 141119,
+      "sha256": "78e17b3f30aee8d41cee8eeff3745c21f8bfacfcba0cad3b5797110236912634"
+    },
+    {
+      "file": "cloudflare/cf-21.png",
+      "width": 1845,
+      "height": 1682,
+      "bytes": 176513,
+      "sha256": "a531e4c87230ff04dd7122f25a9cda5153ac4503556357514ea33e07fdacab17"
+    },
+    {
+      "file": "cloudflare/cf-22.png",
+      "width": 1845,
+      "height": 1620,
+      "bytes": 181063,
+      "sha256": "4b266e73d1a22af09298d0a96f8cdbe11f9745bbb47d2ef1e7cf46e2474392a8"
+    },
+    {
+      "file": "cloudflare/cf-23.png",
+      "width": 1539,
+      "height": 1302,
+      "bytes": 134373,
+      "sha256": "9b401e091289340aaf6cc7e97b3a2ec51b2a392af0f279e77c3491b1fa247f27"
+    },
+    {
+      "file": "cloudflare/cf-24.png",
+      "width": 3520,
+      "height": 1282,
+      "bytes": 151099,
+      "sha256": "452d4b4b6be37ad14330712f7991366f8655838d22b35509346258e6b529cd7d"
+    },
+    {
+      "file": "cloudflare/cf-25.png",
+      "width": 2418,
+      "height": 1372,
+      "bytes": 96256,
+      "sha256": "6db2cd6f2adfcba03a77164541fcf082bf27191c7a53955dae69b95f1bdbd816"
+    },
+    {
+      "file": "cloudflare/cf-26.png",
+      "width": 2425,
+      "height": 1649,
+      "bytes": 143426,
+      "sha256": "1a789d2302df9dada1fbd2411ce6b2976ddead85a7da222adffe45f56910ce70"
+    },
+    {
+      "file": "cloudflare/cf-27.png",
+      "width": 2425,
+      "height": 1353,
+      "bytes": 117130,
+      "sha256": "1edd6835d61db04338f91eb143fa2651b3b120b5d71d0d3fe4efcb5a6f2ebd05"
+    },
+    {
+      "file": "cloudflare/cf-28.png",
+      "width": 2425,
+      "height": 1009,
+      "bytes": 88365,
+      "sha256": "381e8e61dd85335be797d6f3f65f04b50252918bee7377eeea348505fd4d787d"
+    }
+  ],
   "sourceFiles": [
     "docs/tutorial-src/index.html",
     "docs/tutorial-src/styles.css",
@@ -77,5 +276,5 @@
     "scripts/build-tutorial.mjs"
   ],
   "selfContained": true,
-  "screenshotProcessing": "None; original PNG bytes embedded as base64."
+  "screenshotProcessing": "Local application PNGs unchanged. User Cloudflare screenshots cropped at native scale, credentials removed and instructional annotations added before embedding. See cloudflare-captures.json."
 }

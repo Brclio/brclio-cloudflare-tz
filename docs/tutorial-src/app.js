@@ -12,7 +12,9 @@
     toastTimer = setTimeout(() => { toast.hidden = true; }, 2800);
   }
 
-  const progressKey = 'brclio-edge-tutorial:v1:steps';
+  const progressKey = document.body.dataset.guide === 'github'
+    ? 'brclio-edge-tutorial:github:v1:steps'
+    : 'brclio-edge-tutorial:v1:steps';
   const steps = $$('[data-step]');
   let canStore = true;
   try {
@@ -24,6 +26,7 @@
     $('#progress-label').textContent = `${count} / ${steps.length}`;
     $('#mobile-progress').textContent = `已完成 ${count} / ${steps.length}`;
     $('#setup-progress').value = count;
+    $('#setup-progress').max = steps.length;
     if (persist) {
       try {
         localStorage.setItem(progressKey, JSON.stringify(Object.fromEntries(steps.map(input => [input.dataset.step, input.checked]))));
@@ -61,7 +64,7 @@
     const target = document.getElementById(button.dataset.copy);
     if (!target) return;
     const success = await copyText(target.textContent.trim());
-    notify(success ? '命令已复制，可粘贴到终端' : '浏览器未允许复制，请选中命令后手动复制');
+    notify(success ? '已复制，可粘贴使用' : '浏览器未允许复制，请选中文字后手动复制');
     button.focus({ preventScroll: true });
   }));
 
@@ -174,29 +177,62 @@
   const fitButton = $('#image-fit');
   const actualButton = $('#image-actual');
   let imageTrigger;
+  // Keep one ordered entry per figure, excluding the repeated cover image.
+  const gallery = $$('.image-figure [data-image]');
+  const actions = $('.lightbox-actions');
+  const previousImage = document.createElement('button');
+  const nextImage = document.createElement('button');
+  previousImage.type = nextImage.type = 'button';
+  previousImage.className = nextImage.className = 'small-button';
+  previousImage.id = 'image-previous';
+  nextImage.id = 'image-next';
+  previousImage.textContent = '← 上一张';
+  nextImage.textContent = '下一张 →';
+  actions.prepend(previousImage, nextImage);
+  let currentImageIndex = -1;
   function imageMode(actual) {
     stage.classList.toggle('actual', actual);
     fitButton.setAttribute('aria-pressed', String(!actual));
     actualButton.setAttribute('aria-pressed', String(actual));
     stage.scrollTop = stage.scrollLeft = 0;
   }
-  $$('[data-image]').forEach(button => button.addEventListener('click', () => {
+  function showImage(button, opening = false) {
     const image = button.querySelector('img');
     if (!image) return;
-    imageTrigger = button;
+    if (opening) imageTrigger = button;
+    currentImageIndex = gallery.findIndex(item => item.dataset.image === button.dataset.image);
+    previousImage.disabled = currentImageIndex <= 0;
+    nextImage.disabled = currentImageIndex < 0 || currentImageIndex >= gallery.length - 1;
     lightboxImg.src = image.src;
     lightboxImg.alt = image.alt;
     lightboxImg.width = image.naturalWidth || image.width;
     lightboxImg.height = image.naturalHeight || image.height;
+    const annotated = image.dataset.imageKind === 'annotated';
     $('#lightbox-title').textContent = image.alt;
-    $('#lightbox-meta').textContent = `${image.naturalWidth || image.width} × ${image.naturalHeight || image.height} px · PNG`;
+    $('#lightbox-meta').textContent = `${currentImageIndex + 1} / ${gallery.length} · ${image.naturalWidth || image.width} × ${image.naturalHeight || image.height} px · ${annotated ? '高清标注图' : '原始 PNG'}`;
+    const provenance = $('#lightbox-provenance') || $('.lightbox-footer span');
+    if (provenance) provenance.textContent = annotated
+      ? '原像素裁切 · 账号与凭据已遮挡 · 操作位置已标注'
+      : '后台原始 PNG · 未裁剪 / 未重新编码';
     $('#image-download').href = image.src;
-    $('#image-download').download = `brclio-edge-${button.dataset.image}-original.png`;
+    $('#image-download').download = `brclio-edge-${button.dataset.image}-${annotated ? 'annotated' : 'original'}.png`;
+    $('#image-download').textContent = '下载图片 ↓';
     imageMode(false);
-    lightbox.showModal();
-    document.body.style.overflow = 'hidden';
-    $('#image-close').focus();
-  }));
+    if (opening) {
+      lightbox.showModal();
+      document.body.style.overflow = 'hidden';
+      $('#image-close').focus();
+    }
+  }
+  $$('[data-image]').forEach(button => button.addEventListener('click', () => showImage(button, true)));
+  previousImage.addEventListener('click', () => { if (currentImageIndex > 0) showImage(gallery[currentImageIndex - 1]); });
+  nextImage.addEventListener('click', () => { if (currentImageIndex < gallery.length - 1) showImage(gallery[currentImageIndex + 1]); });
+  lightbox.addEventListener('keydown', event => {
+    // At actual size, arrows keep their native scrolling behavior.
+    if (stage.classList.contains('actual')) return;
+    if (event.key === 'ArrowLeft') { event.preventDefault(); previousImage.click(); }
+    if (event.key === 'ArrowRight') { event.preventDefault(); nextImage.click(); }
+  });
   fitButton.addEventListener('click', () => imageMode(false));
   actualButton.addEventListener('click', () => imageMode(true));
   $('#image-close').addEventListener('click', () => lightbox.close());

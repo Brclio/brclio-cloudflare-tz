@@ -132,7 +132,7 @@ const worker = {
                             if (input.port) url.searchParams.set('port', String(input.port));
                         }
                     }
-                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.1', upstreamVersion: Version, kv: true });
+                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.2', upstreamVersion: Version, kv: true });
                     if (request.method === 'POST' && ['admin/cf.json', 'admin/tg.json'].includes(访问路径)) return saveCredentials(request, env, 访问路径 === 'admin/cf.json' ? 'cf' : 'tg');
                     if (访问路径 === 'admin/init' && request.method !== 'POST') return json({ error: '重置配置需要 POST' }, 405, { Allow: 'POST' });
                     if (request.method === 'GET' && 区分大小写访问路径 === 'admin/ADD.txt') {

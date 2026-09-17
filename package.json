@@ -1,6 +1,6 @@
 {
   "name": "brclio-cloudflare-tz",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "description": "Brclio Edge — an open source Cloudflare tunnel console based on cmliu/edgetunnel",

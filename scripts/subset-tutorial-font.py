@@ -12,7 +12,7 @@ Then run from any directory, passing the downloaded full font:
     python scripts/subset-tutorial-font.py --font 'NotoSerifSC[wght].ttf'
 
 --output and --provenance can override the repository-relative defaults.
-The script reads all four tutorial sources, retains printable Unicode from HTML,
+The script reads all tutorial sources, retains printable Unicode from HTML,
 CSS and JavaScript, checks every heading, and embeds the complete existing OFL.
 It does not build tutorial.html or change project dependencies.
 """
@@ -39,6 +39,7 @@ SOURCE_SHA256 = '050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f
 LICENSE_SHA256 = '5e0da210fb04058a8c0087985d2d456b931c2579811a49655721d3cf0c36b6d6'
 SOURCE_FILES = (
     'docs/tutorial-src/index.html',
+    'docs/tutorial-src/github.html',
     'docs/tutorial-src/styles.css',
     'docs/tutorial-src/app.js',
     'scripts/build-tutorial.mjs',
@@ -110,7 +111,9 @@ def main() -> None:
     text = html.unescape(without_data) + string.printable
     wanted = {ord(char) for char in text if char.isprintable()}
     headings = HeadingText()
-    headings.feed(source_texts[0])
+    for relative, source in zip(SOURCE_FILES, source_texts):
+        if relative.endswith('.html'):
+            headings.feed(source)
     heading_points = {ord(char) for char in ''.join(headings.parts) if char.isprintable()}
 
     font = TTFont(args.font, recalcTimestamp=False)
@@ -165,7 +168,7 @@ def main() -> None:
         'licenseEmbeddedInFont': True,
         'textSources': text_sources, 'supplementalText': SUPPLEMENTAL_TEXT,
         'textCorpusSha256': sha256(raw.encode('utf-8')),
-        'subsetMethod': 'All printable Unicode from the four tutorial sources and supplemental labels; HTML entities decoded, embedded base64 removed, ASCII included; static wght=700 before subsetting.',
+        'subsetMethod': 'All printable Unicode from the tutorial sources and supplemental labels; HTML entities decoded, embedded base64 removed, ASCII included; static wght=700 before subsetting.',
         'requestedCodepoints': len(wanted), 'includedCodepoints': len(retained),
         'codepoints': [f'U+{code:04X}' for code in sorted(retained)],
         'missingCharacters': [{'character': chr(code), 'codepoint': f'U+{code:04X}'} for code in missing],

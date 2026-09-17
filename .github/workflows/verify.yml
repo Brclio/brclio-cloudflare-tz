@@ -17,6 +17,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npm run build:tutorial
       - run: npm run check
       - run: npm test
       - uses: actions/upload-artifact@v4
@@ -26,4 +27,6 @@ jobs:
             dist/_worker.js
             dist/brclio-edge-pages.zip
             dist/build-manifest.json
+            docs/tutorial.html
+            docs/github-deploy.html
           if-no-files-found: error

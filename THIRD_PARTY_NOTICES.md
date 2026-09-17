@@ -21,6 +21,8 @@ Copyright (C) 2026 Brclio。新增程序、界面和本仓库自编文档以 GPL
 
 用户指定视频：[YouTube · chcFg878840](https://www.youtube.com/watch?v=chcFg878840)。视频及作者素材版权归原作者；本项目不分发视频、音轨或完整字幕。核验范围与来源见 [docs/video-research.md](docs/video-research.md)。Cloudflare 文档只作为功能与操作步骤的参考，各自版权归权利人。
 
+图文教程另使用用户提供的 28 张 Cloudflare 操作截图，仅用于说明相应界面的操作步骤。Cloudflare 界面、名称及标志的权利归相应权利人；本项目的代码许可不改变这些权利。发布素材保留截图的原生像素比例，按步骤裁剪、移除账号和凭据并增加教学标注；原始凭据截图不随仓库分发。来源尺寸、裁剪、标注、遮盖区域及 PNG 校验值见 [Cloudflare 截图清单](docs/tutorial-assets/cloudflare-captures.json)。
+
 ## 字体
 
 本地中文标题字体 Noto Serif SC 来自 [Google Fonts / Noto Serif SC](https://github.com/google/fonts/tree/main/ofl/notoserifsc)，采用 SIL Open Font License 1.1。仅包含界面所需字符的子集，许可全文见 [licenses/NotoSerifSC-OFL.txt](licenses/NotoSerifSC-OFL.txt)，字符、大小及哈希记录见 [docs/font-provenance.json](docs/font-provenance.json)。字体保留自身 OFL 许可。正文使用系统字体栈，不请求远程字体。

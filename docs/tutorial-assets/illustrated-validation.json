@@ -1,0 +1,399 @@
+{
+  "date": "2026-09-17",
+  "scope": "v1.0.2 prepublication verification of the illustrated tutorial, GitHub deployment guide and release build. Cloud account configuration and production client acceptance are outside this check.",
+  "artifacts": [
+    {
+      "path": "docs/tutorial.html",
+      "bytes": 7118913,
+      "sha256": "72e106532219c72fb9bab023a760fdf0bf0929963c508dd44909c868c7888ac2",
+      "figures": 37,
+      "uniqueImages": 37,
+      "selfContained": true
+    },
+    {
+      "path": "docs/github-deploy.html",
+      "bytes": 916548,
+      "sha256": "d62518e3a5c26fed9b1019fa666cd0ad2c5e10cfc03253483f27092727310c00",
+      "figures": 4,
+      "uniqueImages": 4,
+      "selfContained": true
+    }
+  ],
+  "screenshots": {
+    "cloudflareAnnotated": 28,
+    "localApplicationOriginals": 9,
+    "sourceDimensions": {
+      "5120x2704": 27,
+      "3456x1924": 1
+    },
+    "nativePixelCrop": true,
+    "credentialsRemovedBeforePngEncoding": true,
+    "rawCloudflareCapturesDistributed": false,
+    "annotatedPngBytes": 3547688,
+    "manifest": "cloudflare-captures.json"
+  },
+  "browser": {
+    "tool": "Playwright CLI",
+    "session": "brclio-illustrated",
+    "viewports": [
+      1440,
+      900,
+      390,
+      320
+    ],
+    "offlineProtocols": [
+      "file:"
+    ],
+    "checks": [
+      {
+        "name": "tutorial.html structure",
+        "ok": true,
+        "detail": {
+          "duplicateIds": [],
+          "brokenAnchors": [],
+          "brokenCopies": 0,
+          "figures": 37,
+          "font": true
+        }
+      },
+      {
+        "name": "tutorial.html layout 1440 false",
+        "ok": true,
+        "detail": {
+          "width": 1440,
+          "scroll": 1440
+        }
+      },
+      {
+        "name": "tutorial.html layout 1440 true",
+        "ok": true,
+        "detail": {
+          "width": 1440,
+          "scroll": 1440
+        }
+      },
+      {
+        "name": "tutorial.html layout 900 false",
+        "ok": true,
+        "detail": {
+          "width": 900,
+          "scroll": 900
+        }
+      },
+      {
+        "name": "tutorial.html layout 900 true",
+        "ok": true,
+        "detail": {
+          "width": 900,
+          "scroll": 900
+        }
+      },
+      {
+        "name": "tutorial.html layout 390 false",
+        "ok": true,
+        "detail": {
+          "width": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "tutorial.html layout 390 true",
+        "ok": true,
+        "detail": {
+          "width": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "tutorial.html layout 320 false",
+        "ok": true,
+        "detail": {
+          "width": 320,
+          "scroll": 320
+        }
+      },
+      {
+        "name": "tutorial.html layout 320 true",
+        "ok": true,
+        "detail": {
+          "width": 320,
+          "scroll": 320
+        }
+      },
+      {
+        "name": "tutorial.html mobile menu",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html menu Escape",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html progress",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html progress persistence",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html FAQ empty",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html FAQ matches",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html high resolution",
+        "ok": true,
+        "detail": "1 / 37 · 4125 × 1729 px · 高清标注图"
+      },
+      {
+        "name": "tutorial.html gallery next",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html gallery keyboard",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html actual pixels",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html PNG downloaded",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html close focus",
+        "ok": true
+      },
+      {
+        "name": "UUID v4",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html structure",
+        "ok": true,
+        "detail": {
+          "duplicateIds": [],
+          "brokenAnchors": [],
+          "brokenCopies": 0,
+          "figures": 4,
+          "font": true
+        }
+      },
+      {
+        "name": "github-deploy.html layout 1440 false",
+        "ok": true,
+        "detail": {
+          "width": 1440,
+          "scroll": 1440
+        }
+      },
+      {
+        "name": "github-deploy.html layout 1440 true",
+        "ok": true,
+        "detail": {
+          "width": 1440,
+          "scroll": 1440
+        }
+      },
+      {
+        "name": "github-deploy.html layout 900 false",
+        "ok": true,
+        "detail": {
+          "width": 900,
+          "scroll": 900
+        }
+      },
+      {
+        "name": "github-deploy.html layout 900 true",
+        "ok": true,
+        "detail": {
+          "width": 900,
+          "scroll": 900
+        }
+      },
+      {
+        "name": "github-deploy.html layout 390 false",
+        "ok": true,
+        "detail": {
+          "width": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "github-deploy.html layout 390 true",
+        "ok": true,
+        "detail": {
+          "width": 390,
+          "scroll": 390
+        }
+      },
+      {
+        "name": "github-deploy.html layout 320 false",
+        "ok": true,
+        "detail": {
+          "width": 320,
+          "scroll": 320
+        }
+      },
+      {
+        "name": "github-deploy.html layout 320 true",
+        "ok": true,
+        "detail": {
+          "width": 320,
+          "scroll": 320
+        }
+      },
+      {
+        "name": "github-deploy.html mobile menu",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html menu Escape",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html progress",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html progress persistence",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html FAQ empty",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html FAQ matches",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html high resolution",
+        "ok": true,
+        "detail": "1 / 4 · 1165 × 1107 px · 高清标注图"
+      },
+      {
+        "name": "github-deploy.html gallery next",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html gallery keyboard",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html actual pixels",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html PNG downloaded",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html close focus",
+        "ok": true
+      },
+      {
+        "name": "independent article progress",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html offline images",
+        "ok": true,
+        "detail": 38
+      },
+      {
+        "name": "tutorial.html offline lightbox",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html offline images",
+        "ok": true,
+        "detail": 4
+      },
+      {
+        "name": "github-deploy.html offline lightbox",
+        "ok": true
+      },
+      {
+        "name": "no JavaScript errors",
+        "ok": true,
+        "detail": []
+      },
+      {
+        "name": "no external runtime requests",
+        "ok": true,
+        "detail": []
+      },
+      {
+        "name": "Git guide actual clipboard",
+        "ok": true
+      },
+      {
+        "name": "320px lightbox fits",
+        "ok": true,
+        "detail": {
+          "left": 12,
+          "right": 308,
+          "width": 320,
+          "scroll": 294,
+          "client": 294
+        }
+      },
+      {
+        "name": "mobile native pixel zoom",
+        "ok": true
+      },
+      {
+        "name": "Git to manual guide navigation",
+        "ok": true
+      },
+      {
+        "name": "Manual to Git guide navigation",
+        "ok": true
+      },
+      {
+        "name": "Git progress reset",
+        "ok": true
+      }
+    ],
+    "passed": 56,
+    "failed": 0,
+    "pageErrors": [],
+    "externalRuntimeRequests": []
+  },
+  "downloads": [
+    {
+      "download": "tutorial-download.png",
+      "source": "docs/tutorial-assets/cloudflare/cf-01.png",
+      "sha256": "270e008e4aedc2a48fe1ef1391d436f56246641a8ca1f2be6d39aa651f08e9c0",
+      "byteIdentical": true
+    },
+    {
+      "download": "github-deploy-download.png",
+      "source": "docs/tutorial-assets/cloudflare/cf-05.png",
+      "sha256": "523926ad23b166695d53ff3f8ca8e4e94fb3a8e0880da33c9ad5cb43f88a2772",
+      "byteIdentical": true
+    }
+  ],
+  "limitations": [
+    "Cloudflare account resources, DNS and production deployment were not changed by the documentation and release work.",
+    "These checks do not establish public-network client acceptance.",
+    "Git push, CI and release asset verification are recorded separately in the published release notes."
+  ],
+  "releaseTag": "v1.0.2",
+  "applicationChecks": {
+    "node": "22.23.2",
+    "syntax": "passed",
+    "tests": 119,
+    "passed": 119,
+    "failed": 0,
+    "skipped": 0,
+    "build": "passed",
+    "version": "1.0.2"
+  }
+}

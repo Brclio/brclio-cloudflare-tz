@@ -4,17 +4,21 @@
 
 管理页面、样式、脚本、字体和二维码组件均在仓库内维护，构建后嵌入独立 Worker。项目以 **GPL-2.0-only** 开源，允许使用、修改、再分发和商业使用。
 
-[下载 Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) · [完整部署与使用教程](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/brclio-edge-tutorial.html) · [功能对照](docs/upstream-feature-matrix.md) · [验证记录](docs/validation.md) · [许可证](LICENSE)
+[下载 Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) · [高清部署图文教程](docs/tutorial.html) · [GitHub 自动部署与同步教程](docs/github-deploy.html) · [功能对照](docs/upstream-feature-matrix.md) · [验证记录](docs/validation.md) · [许可证](LICENSE)
+
+两篇教程均为内嵌图片与字体的独立 HTML，可在仓库文件页选择 **Download raw file** 后打开；放在同一目录时可互相跳转。当前仓库版新增 28 张高清操作标注图，支持点击放大、原始尺寸查看和图片下载；也可下载下方 v1.0.2 的教程合集 ZIP，解压后打开。
 
 ## 快速部署
 
-从 [GitHub Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) 下载预构建文件即可部署，无需安装 Node.js 或自行构建。下面是 **v1.0.1** 的部署包与教程：
+从 [GitHub Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) 下载预构建文件即可部署，无需安装 Node.js 或自行构建。下面是 **v1.0.2** 的部署包与教程：
 
 | 下载文件 | 用途 |
 | --- | --- |
-| [brclio-edge-pages.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/brclio-edge-pages.zip) | 推荐：直接上传到 Cloudflare Pages 的拖放部署入口 |
-| [_worker.js](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/_worker.js) | 在 Workers 代码编辑器中替换全部示例代码 |
-| [brclio-edge-tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/brclio-edge-tutorial.html) | 下载后双击打开的完整图文教程 |
+| [brclio-edge-pages.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/brclio-edge-pages.zip) | 推荐：直接上传到 Cloudflare Pages 的拖放部署入口 |
+| [_worker.js](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/_worker.js) | 在 Workers 代码编辑器中替换全部示例代码 |
+| [tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/tutorial.html) | 下载后双击打开的完整图文教程 |
+| [github-deploy.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/github-deploy.html) | 通过 GitHub 配置、自动部署、维护与同步 |
+| [brclio-edge-guides.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/brclio-edge-guides.zip) | 推荐：两篇离线教程合集，解压后可互相跳转 |
 
 仓库和 Release 均已公开，部署包与教程可直接下载，无需登录 GitHub。
 
@@ -106,7 +110,7 @@ npm run dev
 | `npm run check` | 检查源码、前端和构建脚本的 JavaScript 语法 |
 | `npm test` | 构建并运行自动化测试 |
 | `npm run build` | 生成独立 Worker、Pages 目录、上传 ZIP 与构建清单 |
-| `npm run build:tutorial` | 重新生成内嵌原图的独立 HTML 教程 |
+| `npm run build:tutorial` | 重新生成两篇内嵌高清配图的独立 HTML 教程 |
 
 测试覆盖管理会话、配置持久化、订阅、真实 workerd 到本地 TCP 的协议转发、手动测速控制及下载产物再启动。具体执行环境、结果和限制见[验证记录](docs/validation.md)；本地与受控测试不等同于 Cloudflare 生产部署或公网客户端验收。
 
@@ -139,7 +143,7 @@ Pages 的变量和绑定应设置在目标部署环境中，保存后重新部�
 
 ### 完整教程
 
-下载 [brclio-edge-tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/brclio-edge-tutorial.html) 后，**双击文件即可在浏览器打开**。教程是可独立打开的单文件 HTML，内嵌样式与截图；截图可按原始尺寸查看。仓库内也保留 [docs/tutorial.html](docs/tutorial.html) 与 [原始 PNG](docs/tutorial-assets/original/)。
+下载 [tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/tutorial.html) 后，**双击文件即可在浏览器打开**。教程是可独立打开的单文件 HTML，内嵌样式与截图；截图可按原始尺寸查看。另可下载 [GitHub 教程](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/github-deploy.html)。两篇保持原文件名并放在同一文件夹，或直接下载 [教程合集 ZIP](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.2/brclio-edge-guides.zip)。仓库内保留 [教程源码](docs/tutorial-src/README.md)、[后台原始 PNG](docs/tutorial-assets/original/) 和 [Cloudflare 标注图](docs/tutorial-assets/cloudflare/)。
 
 教程包含账号与域名准备、KV 创建、Pages / Workers 部署、后台配置、客户端订阅及测速操作，并提供章节导航、进度勾选、命令复制和故障搜索。在 GitHub 文件页查看时，请先下载 HTML 文件再打开。
 
@@ -178,7 +182,8 @@ wrangler.toml               Workers 配置
 
 | 文档 | 内容 |
 | --- | --- |
-| [部署与使用教程](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.1/brclio-edge-tutorial.html) | Release 附件，下载后直接打开的完整图文教程 |
+| [高清部署与使用教程](docs/tutorial.html) | 28 张 Cloudflare 操作标注图、9 张后台原图；下载 HTML 可离线阅读 |
+| [GitHub 自动部署与同步教程](docs/github-deploy.html) | Fork、Pages Git 集成、构建配置、更新同步、迁移和回滚 |
 | [架构与上游分析](docs/architecture.md) | 固定基线、请求分流、配置状态与外部依赖 |
 | [上游功能对照](docs/upstream-feature-matrix.md) | 功能对应关系及实现、验证边界 |
 | [管理 API 契约](docs/api-contract.md) | 管理接口、请求与配置行为 |

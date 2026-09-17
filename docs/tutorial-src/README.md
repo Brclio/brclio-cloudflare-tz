@@ -1,39 +1,42 @@
 # 教程源文件
 
-读者使用 [`../tutorial.html`](../tutorial.html)：下载后可直接打开的单文件手册。此目录供维护者编辑。
+读者使用两篇独立 HTML：[部署与使用](../tutorial.html)、[GitHub 自动部署与同步](../github-deploy.html)。每篇内嵌自己的图片、字体、样式和脚本，下载后可直接离线打开。两篇放在同一文件夹时，文内链接可互相跳转。GitHub 文件页的 **Download raw file** 可以下载 HTML；Release 历史附件不会随仓库文件自动更新。
 
 ## 修改与构建
 
-- `index.html`：章节、中文操作说明、图片占位和许可入口。
-- `styles.css`：独立编写的 Brclio 教程样式、响应式与打印布局。
-- `app.js`：目录、进度勾选、复制、本地 UUID v4 生成、原图查看和问题搜索。无网络请求。
-- `../tutorial-assets/original/`：实际运行界面的原始截图。
-- `../../scripts/build-tutorial.mjs`：将原图、字体、样式和脚本嵌入单文件。
-
-在项目根目录运行：
+- `index.html`：手动上传 Pages、配置、域名与日常使用。
+- `github.html`：Fork、Pages Git 集成、更新、同步、迁移与回滚。
+- `styles.css`、`app.js`：共享排版和交互。两篇使用独立进度记录。
+- `../tutorial-assets/original/`：9 张本地管理后台原始截图，保持已有字节。
+- `../tutorial-assets/cloudflare/`：28 张用户提供实操截图制作的教学 PNG，已裁切、遮挡账号和凭据、添加编号与箭头。
+- `../../scripts/build-tutorial.mjs`：生成两篇可离线阅读的 HTML，以及各自构建清单。
 
 ```sh
 npm run build:tutorial
 ```
 
-构建会核对每张 PNG 的原始 SHA-256 与宽高、保留脚本原始内容并检查语法，然后生成 `docs/tutorial.html` 与 `docs/tutorial-assets/build-manifest.json`。普通应用构建不包含教程，避免把图文材料打进 Worker 部署包。
+构建会核对所有 PNG 的 SHA-256 和宽高，检查内嵌脚本语法与字节一致性，拒绝未替换占位符和外部运行资源。每篇只嵌入自己使用的图片。普通应用构建不包含教程，避免把教学材料打进 Worker。
 
-源文件中的 `@@FIGURE:文件名:说明@@` 对应一张原图；`@@IMAGE:文件名@@` 用于封面复用。文件名不包含 `.png`，从 `local-captures.json` 读取尺寸与哈希。图片在浏览器内按 CSS 适配显示，下载和 100% 模式使用同一份原始字节。
+`@@FIGURE:文件名:说明@@` 插入可放大的图片，`@@IMAGE:文件名@@` 用于封面。文件名不带 `.png`；后台图从 `local-captures.json` 读取，Cloudflare 图从 `cloudflare-captures.json` 读取。查看器支持适应窗口、100% 像素尺寸、前后切图、键盘切图、Esc 关闭与下载。100% 模式保留方向键滚动。
 
-## 更新截图
+## 配图维护
 
-在本项目本地运行环境打开实际页面，使用应用自身的密码遮盖状态，先等待字体与界面稳定，再直接保存完整视口 PNG。不要裁剪、缩放、重新编码或添加遮挡图层；通过页面控件在拍摄前隐藏凭据。
+新提供的 Cloudflare 操作截图按用户要求裁切、标注。教学组件使用真实截图作为底图，在原始像素比例下保留操作区域；中文编号说明与箭头由浏览器绘制，保持 UI 文案原貌。多数来源为 5120×2704，DNS 弹窗来源为 3456×1924。
 
-替换原图时同步更新 `../tutorial-assets/local-captures.json` 的 URL、时间、视口、滚动位置、尺寸、字节数和 SHA-256，并核对图注是否描述了截图中可见的操作。构建会拒绝哈希不符的图片。
+账号、ADMIN、UUID 等在教学 PNG 中不透明遮挡或由裁切彻底移除。**含凭据的原始截图不得复制进仓库、HTML、SVG、打包产物或公开下载。** 清单只记录来源文件名、尺寸、SHA-256、裁切、遮挡与标注信息；阅读时仅使用处理后的 PNG。不要用可被关闭的 HTML 遮挡层代替图片像素中的遮挡。
+
+`../../scripts/prepare-cloudflare-screenshots.mjs` 记录了素材制作流程。该脚本只在重新制作教学图时使用；普通构建与阅读不需要原始截图或浏览器工具。更换教学 PNG 后，同步更新 `cloudflare-captures.json` 的尺寸、字节数与 SHA-256，再运行教程构建。
+
+已有 9 张后台原图仍遵循原有无后处理流程：在本地运行页面中使用原生凭据遮盖控件，等待界面稳定后保存视口 PNG，更新 `local-captures.json`。新图和旧图的处理方式分别记录，不将标注图称为未经处理的原始截图。
 
 ## 字体与许可
 
-中文衬线标题使用官方 Noto Serif SC 700 的本地子集，完整 OFL 保留在 HTML 与字体文件内。来源、固定提交和字符记录见 `../tutorial-assets/font-provenance.json`。正文为系统字体。
+标题使用官方 Noto Serif SC 700 的本地子集；完整 OFL 保留在 HTML 与字体文件内。来源、固定提交与字符记录见 `../tutorial-assets/font-provenance.json`，正文使用系统字体。
 
-新增标题字符后，使用 `../../scripts/subset-tutorial-font.py` 从记录的官方完整字体重建子集，再运行教程构建。重建工具需要 Python、fontTools 和 Brotli；普通阅读或构建 HTML 不需要安装这些字体工具。
+新增标题字符后，使用 `../../scripts/subset-tutorial-font.py` 从记录的官方完整字体重建子集，再构建两篇教程。脚本检查两篇 HTML 的标题覆盖；需要 Python、fontTools 和 Brotli，阅读和普通 HTML 构建不需要这些工具。
 
-本教程的布局、交互与正文独立编写，以 GPL-2.0-only 提供；采用 Brclio 品牌配色与中文衬线排版原则。未把带非商业限制的设计系统模板或第三方图片复制进发行文件。上游程序署名与字体许可保持独立清晰。
+教程的布局、交互与正文独立编写，以 GPL-2.0-only 提供，沿用 Brclio 品牌配色与中文衬线排版原则。没有将带非商业限制的设计模板复制进发行文件。Cloudflare 控制台画面用于操作说明，相关标识归其权利人所有；上游程序与字体许可独立保留。
 
 ## 验证
 
-参见 [`../tutorial-validation.md`](../tutorial-validation.md)。修改后至少检查桌面、390px 手机与最窄布局、导航、复制、进度、问题搜索、原图查看与下载；从 `file://` 离线打开，确认没有运行时外部资源请求。实际下载 PNG 的 SHA-256 应等于原文件。
+参见 [验证记录](../tutorial-validation.md)。检查两篇的桌面、390px 与 320px 手机布局、章节锚点、两篇互链、复制、独立进度、问题搜索、图片放大与下载。用 `file://` 离线打开确认无外部资源请求，下载图片的 SHA-256 应等于对应已审核 PNG。
