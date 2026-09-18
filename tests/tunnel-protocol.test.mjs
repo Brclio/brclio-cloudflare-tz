@@ -14,6 +14,30 @@ let mf;
 let server;
 let tcpPort;
 let acceptedConnections = 0;
+const root = fileURLToPath(new URL('..', import.meta.url));
+// The production connector seam maps the named regression destination onto
+// real local TCP. Every other destination is rejected, so protocol tests cannot
+// accidentally contact a public endpoint. Early-data is inserted inside workerd
+// because dispatchFetch may normalize WebSocket subprotocol negotiation.
+const wrapper = `
+import worker from './dist/_worker.js';
+import { connect } from 'cloudflare:sockets';
+export default { fetch(request, env, ctx) {
+  if (request.headers.has('x-fixture-early-data')) {
+    const headers = new Headers(request.headers);
+    headers.set('sec-websocket-protocol', headers.get('x-fixture-early-data'));
+    request = new Request(request, { headers });
+  }
+  Object.defineProperty(request, 'cf', { value: { colo: 'TEST', asn: 0, country: 'XX', city: 'Local test' } });
+  Object.defineProperty(request, 'fetcher', { value: { connect(options, init) {
+    const local = options.hostname === '127.0.0.1' && options.port === Number(env.FIXTURE_PORT);
+    const named = options.hostname === 'fixture.example.com' && options.port === 443;
+    if (!local && !named) throw new Error('Unexpected destination in local protocol test');
+    return connect({ hostname: '127.0.0.1', port: Number(env.FIXTURE_PORT) }, init);
+  } } });
+  return worker.fetch(request, env, ctx);
+} };
+`;
 
 before(async () => {
   server = net.createServer(socket => {
@@ -29,8 +53,11 @@ before(async () => {
   });
   tcpPort = server.address().port;
   mf = new Miniflare(convertV4MiniflareOptions({
-    modules: true,
-    scriptPath: fileURLToPath(new URL('../dist/_worker.js', import.meta.url)),
+    modulesRoot: root,
+    modules: [
+      { type: 'ESModule', path: `${root}/tunnel-protocol-fixture.mjs`, contents: wrapper },
+      { type: 'ESModule', path: `${root}/dist/_worker.js` },
+    ],
     compatibilityDate: '2025-11-04',
     cf: { colo: 'TEST', asn: 0, country: 'XX', city: 'Local test' },
     kvNamespaces: ['KV'],
@@ -41,6 +68,7 @@ before(async () => {
       PROXYIP: `127.0.0.1:${tcpPort}`,
       TCP_CONCURRENT_DIAL: '1',
       PROXY_CONCURRENT_DIAL: '1',
+      FIXTURE_PORT: String(tcpPort),
     },
   }));
   await mf.ready;
@@ -54,9 +82,9 @@ after(async () => {
   if (server?.listening) await new Promise(resolve => server.close(resolve));
 });
 
-async function openWebSocket(path = '/') {
+async function openWebSocket(path = '/', headers = {}) {
   const response = await mf.dispatchFetch(`https://tunnel.example.com${path}`, {
-    headers: { Upgrade: 'websocket', 'User-Agent': 'Brclio-Protocol-QA' },
+    headers: { Upgrade: 'websocket', 'User-Agent': 'Brclio-Protocol-QA', ...headers },
   });
   assert.equal(response.status, 101);
   assert.ok(response.webSocket, 'Worker must return an upgraded WebSocket');
@@ -511,3 +539,112 @@ for (const [protocol, handshake] of [['VLESS', vlessHandshake], ['Trojan', troja
     });
   }
 }
+
+// A normal HTTP request to this hostname places CRLF at packet bytes 56/57.
+// The old WS/gRPC discriminator mistook those application bytes for Trojan.
+function vlessHttpCollision(payload) {
+  const host = Buffer.from('fixture.example.com');
+  return Buffer.concat([Buffer.from([0]), Buffer.from(uuid.replaceAll('-', ''), 'hex'),
+    Buffer.from([0, 1, 1, 187, 2, host.length]), host, payload]);
+}
+
+for (const transport of ['ws', 'grpc-gun', 'xhttp']) {
+  test(`VLESS ${transport} authenticates the HTTP CRLF collision instead of misclassifying it as Trojan`, { timeout: 10000 }, async () => {
+    const before = acceptedConnections;
+    const payload = Buffer.from('GET / HTTP/1.1\r\nHost: fixture.example.com\r\n\r\n');
+    const packet = vlessHttpCollision(payload);
+    assert.deepEqual(packet.subarray(56, 58), Buffer.from('\r\n'));
+    const expected = Buffer.concat([Buffer.from([0, 0]), payload]);
+    if (transport === 'ws') {
+      const ws = await openWebSocket();
+      try { assertSameBytes(await receiveBytes(ws, expected.length, () => ws.send(packet)), expected, 'HTTP collision'); }
+      finally { try { ws.close(); } catch {} }
+    } else {
+      const tunnel = await openHttpTunnel(transport, transport === 'grpc-gun' ? grpcFrame([packet]) : packet);
+      try { assertSameBytes(await tunnel.readBytes(expected.length), expected, 'HTTP collision'); }
+      finally { await tunnel.close(); }
+    }
+    assert.equal(acceptedConnections, before + 1);
+  });
+}
+
+for (const [protocol, handshake] of [['VLESS', vlessHandshake], ['Trojan', trojanHandshake]]) {
+  test(`${protocol} WebSocket buffers a header delivered one byte per message`, { timeout: 10000 }, async () => {
+    const before = acceptedConnections;
+    const payload = Buffer.from(`${protocol} fragmented header payload`);
+    const packet = handshake(uuid, payload);
+    const expected = protocol === 'VLESS' ? Buffer.concat([Buffer.from([0, 0]), payload]) : payload;
+    const headerLength = packet.length - payload.length;
+    const ws = await openWebSocket();
+    try {
+      const output = await receiveBytes(ws, expected.length, () => {
+        for (let index = 0; index < headerLength; index++) ws.send(packet.subarray(index, index + 1));
+        ws.send(packet.subarray(headerLength));
+      });
+      assertSameBytes(output, expected, 'One-byte header fragments');
+      assert.equal(acceptedConnections, before + 1);
+    } finally { try { ws.close(); } catch {} }
+  });
+
+  test(`${protocol} WebSocket retains partial early-data until the remaining header arrives`, { timeout: 15000 }, async () => {
+    const payload = Buffer.from(`${protocol} early-data remainder`);
+    const packet = handshake(uuid, payload);
+    const expected = protocol === 'VLESS' ? Buffer.concat([Buffer.from([0, 0]), payload]) : payload;
+    for (const split of protocol === 'VLESS' ? [1, 8, 18] : [1, 24, 56]) {
+      const before = acceptedConnections;
+      const ws = await openWebSocket('/', { 'x-fixture-early-data': packet.subarray(0, split).toString('base64url') });
+      try {
+        assert.equal(acceptedConnections, before, 'An incomplete credential/header cannot dial');
+        const output = await receiveBytes(ws, expected.length, () => ws.send(packet.subarray(split)));
+        assertSameBytes(output, expected, `Early-data split ${split}`);
+        assert.equal(acceptedConnections, before + 1);
+      } finally { try { ws.close(); } catch {} }
+    }
+  });
+
+  for (const transport of ['grpc-gun', 'grpc-multi']) {
+    test(`${protocol} ${transport} buffers protocol headers across distinct protobuf messages`, { timeout: 10000 }, async () => {
+      const before = acceptedConnections;
+      const payload = Buffer.from(`${protocol} ${transport} split Hunks`);
+      const packet = handshake(uuid, payload);
+      const split = protocol === 'VLESS' ? 8 : 24;
+      const chunks = [packet.subarray(0, split), packet.subarray(split, split + 3), packet.subarray(split + 3)];
+      const initial = Buffer.concat(chunks.map(chunk => grpcFrame(transport === 'grpc-multi'
+        ? [chunk.subarray(0, 1), chunk.subarray(1)] : [chunk])));
+      const tunnel = await openHttpTunnel(transport, initial);
+      try {
+        const expected = protocol === 'VLESS' ? Buffer.concat([Buffer.from([0, 0]), payload]) : payload;
+        assertSameBytes(await tunnel.readBytes(expected.length), expected, 'Protocol header split between Hunks');
+        assert.equal(acceptedConnections, before + 1);
+      } finally { await tunnel.close(); }
+    });
+  }
+
+  test(`${protocol} rejects malformed commands and address types across all transports before local TCP`, { timeout: 15000 }, async () => {
+    const packet = handshake(uuid, Buffer.from('must-not-reach-tcp'));
+    for (const offset of protocol === 'VLESS' ? [18, 21] : [58, 59, 56, 66]) {
+      const malformed = Buffer.from(packet);
+      malformed[offset] = 255;
+      await rejectWebSocketPayload('/', malformed);
+      for (const transport of ['grpc-gun', 'xhttp']) {
+        const before = acceptedConnections;
+        const tunnel = await openHttpTunnel(transport, transport === 'grpc-gun' ? grpcFrame([malformed]) : malformed, true);
+        try {
+          const response = await tunnel.readToEnd();
+          assert.equal(tunnel.response.status, transport === 'xhttp' ? 400 : 200);
+          assert.equal(response.toString(), transport === 'xhttp' ? 'Invalid request' : '');
+          assert.equal(acceptedConnections, before, `Malformed ${protocol} field ${offset} must not dial`);
+        } finally { await tunnel.close(); }
+      }
+    }
+  });
+}
+
+test('WebSocket binary subprotocol is ignored before a normal authenticated handshake', { timeout: 10000 }, async () => {
+  const payload = Buffer.from('binary is a subprotocol name');
+  const expected = Buffer.concat([Buffer.from([0, 0]), payload]);
+  const ws = await openWebSocket('/', { 'x-fixture-early-data': 'binary' });
+  try {
+    assertSameBytes(await receiveBytes(ws, expected.length, () => ws.send(vlessHandshake(uuid, payload))), expected, 'binary subprotocol');
+  } finally { try { ws.close(); } catch {} }
+});

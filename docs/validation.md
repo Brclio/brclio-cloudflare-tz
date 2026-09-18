@@ -2,6 +2,27 @@
 
 首次本地核验：2026-09-15；发布复核：2026-09-16。这里记录实际执行过的检查，便于维护者复现；不代表已在 Cloudflare 生产环境部署。
 
+## 2026-09-18 原版逻辑深度对照与代理修复（v1.0.7）
+
+固定上游 `448a83ced00a43c1d892d5ecbed86a26ea9eeaff`，本地修改前为 `dc663db` / v1.0.6。完整范围、基线证据、原版同样存在的缺陷和未修复限制见 [代理深度排查](proxy-deep-audit.md)。
+
+本轮 `npm test` **331 / 331 通过，0 失败、0 跳过**，比 v1.0.6 增加 106 项；`npm run check`、`git diff --check`、构建及 `wrangler deploy --dry-run` 通过。没有上传到 Cloudflare 或修改用户的 Clash 配置。
+
+- **21 项协议首包回归**：7 项生产共享解析器测试和 14 项实际 bundle / workerd / 本机 TCP 测试。覆盖合法 VLESS HTTP 被误判 Trojan、完整认证前的逐字节拆分、WS early-data 分段、gRPC gun / multi 跨 Hunk、XHTTP 复用、最大合法头、大首载荷及错误认证/命令/地址/分隔符不拨号。
+- **20 项代理握手与流回归**：12 项真实 HTTP CONNECT / SOCKS5 服务用例，加 8 项前缀流背压、EOF、异常、取消和 TLS 定时器用例；业务首批与后续字节不丢失、不重复。定时器测试执行实际 TlsClient.readChunk 方法，但不是完整公网 TLS 证书验证。
+- **52 项路由与订阅回归**：39 项实际 handler / gRPC / 认证代理用例，加 13 项池匹配与 ECH YAML 测试。包括大小写和冒号密码、IPv6、混合指令优先级、编码路径 RPC 后缀、query 路由规范化、标准白名单与全局区分、旧坏 KV 可编辑、错误出口零拨号、节点备注错误固定 400。ECH 的 12 种格式测试只证明参数补丁输出，不证明真实 ECH 握手。
+- **13 项 DNS 回归**：12 项执行生产 DoH 函数的 DNS wire / 受控时钟用例；另 1 项实际 workerd 中 TXT 响应正文卡住、A 正常时，在约 3 秒后取消 TXT 并完成 HTTP 回退。覆盖短 TTL、TTL 0、CNAME、SOA 负缓存、无 SOA 不缓存及解析服务隔离。
+- 最终本地运行使用 Node v26.5.0；仓库 CI 配置使用 Node 22。原版与修改前的失败对照属于审计基线，当前完整回归运行的是最终 v1.0.7 bundle。
+
+产物核对：独立 Worker、Pages 目录中的 Worker、ZIP 内 Worker 逐字节相同，版本元数据和 manifest 一致。此处为本地构建结果：
+
+| 产物 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| `dist/_worker.js` | 2,159,841 | `c97e8efa9b41dc4bb73435eaa41067a96c9d38c58f7f7f37d2f2ee70528dcccd` |
+| `dist/brclio-edge-pages.zip` | 732,012 | `eb9ddc65709c358555f2820f14249ab04399475e10674f7974adcb4f9577fb89` |
+
+v1.0.7 未做生产部署、部署后 Clash 对照、带宽压测或长时间运行验收。UDP DNS、gRPC 上传半关闭、SS 地址跨 AEAD 记录、自定义 TLS 证书验证与 TURN 刷新等限制仍在完整报告中列出；不能把 331 项通过解释为这些范围已经解决。
+
 ## 2026-09-18 Clash 手动测速回退端口修复（v1.0.6）
 
 本轮 `npm test` 为 **225 / 225 通过，0 失败、0 跳过**；语法检查、构建、`git diff --check` 和 `wrangler deploy --dry-run` 通过，未执行 Cloudflare 部署。

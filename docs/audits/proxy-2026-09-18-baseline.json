@@ -1,0 +1,494 @@
+{
+  "date": "2026-09-18",
+  "upstreamCommit": "448a83ced00a43c1d892d5ecbed86a26ea9eeaff",
+  "upstreamWorkerSha256": "f4deaac96bb6ab5bcdd1b27b20bfce7c51d0210caf4c4620ee291f57b5b83fc7",
+  "localBaseCommit": "dc663db0307b64b8d1bbeb111119e34e56b5cf3a",
+  "functionComparisonScope": "Named top-level function and class bodies only; entrypoint, imports, arrow functions and globals reviewed separately.",
+  "functionCounts": {
+    "identical": 108,
+    "changed": 10,
+    "upstream-only": 4,
+    "local-only": 6
+  },
+  "changedDeclarations": [
+    {
+      "name": "处理叉HTTP请求",
+      "status": "changed",
+      "upstreamLine": 595,
+      "localLine": 597
+    },
+    {
+      "name": "处理gRPC请求",
+      "status": "changed",
+      "upstreamLine": 979,
+      "localLine": 970
+    },
+    {
+      "name": "处理WS请求",
+      "status": "changed",
+      "upstreamLine": 1290,
+      "localLine": 1259
+    },
+    {
+      "name": "forwardataTCP",
+      "status": "changed",
+      "upstreamLine": 2169,
+      "localLine": 2071
+    },
+    {
+      "name": "isSpeedTestSite",
+      "status": "upstream-only",
+      "upstreamLine": 3096,
+      "localLine": null
+    },
+    {
+      "name": "构造本地204响应",
+      "status": "upstream-only",
+      "upstreamLine": 3102,
+      "localLine": null
+    },
+    {
+      "name": "构造WS本地204响应",
+      "status": "upstream-only",
+      "upstreamLine": 3118,
+      "localLine": null
+    },
+    {
+      "name": "创建请求TCP连接器",
+      "status": "changed",
+      "upstreamLine": 3329,
+      "localLine": 3192
+    },
+    {
+      "name": "withTimeout",
+      "status": "upstream-only",
+      "upstreamLine": 4053,
+      "localLine": null
+    },
+    {
+      "name": "请求日志记录",
+      "status": "changed",
+      "upstreamLine": 5336,
+      "localLine": 5187
+    },
+    {
+      "name": "读取config_JSON",
+      "status": "changed",
+      "upstreamLine": 5597,
+      "localLine": 5448
+    },
+    {
+      "name": "生成随机IP",
+      "status": "changed",
+      "upstreamLine": 5875,
+      "localLine": 5733
+    },
+    {
+      "name": "getCloudflareUsage",
+      "status": "changed",
+      "upstreamLine": 6346,
+      "localLine": 6259
+    },
+    {
+      "name": "解析地址端口",
+      "status": "changed",
+      "upstreamLine": 6437,
+      "localLine": 6360
+    },
+    {
+      "name": "识别订阅运营商",
+      "status": "local-only",
+      "upstreamLine": null,
+      "localLine": 5725
+    },
+    {
+      "name": "emptyCloudflareUsage",
+      "status": "local-only",
+      "upstreamLine": null,
+      "localLine": 6212
+    },
+    {
+      "name": "usageValidationCredentials",
+      "status": "local-only",
+      "upstreamLine": null,
+      "localLine": 6215
+    },
+    {
+      "name": "normalizeCloudflareUsage",
+      "status": "local-only",
+      "upstreamLine": null,
+      "localLine": 6230
+    },
+    {
+      "name": "sumCloudflareRequests",
+      "status": "local-only",
+      "upstreamLine": null,
+      "localLine": 6237
+    },
+    {
+      "name": "readCloudflareUsage",
+      "status": "local-only",
+      "upstreamLine": null,
+      "localLine": 6247
+    }
+  ],
+  "protocolEvidenceNote": "Pre-fix workerd/local TCP fixtures. current means the local v1.0.6 base, not the patched build. Hex contains synthetic fixture data only. These are correctness reproductions, not public throughput measurements.",
+  "protocolEvidence": [
+    {
+      "version": "current",
+      "cases": [
+        {
+          "name": "VLESS valid HTTP first payload with CRLF at bytes 56/57",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC VLESS valid HTTP with CRLF at bytes 56/57",
+          "status": 200,
+          "bytes": 0,
+          "hex": "",
+          "done": true,
+          "dials": 0
+        },
+        {
+          "name": "XHTTP VLESS valid HTTP with CRLF at bytes 56/57 control",
+          "status": 200,
+          "bytes": 47,
+          "hex": "0000474554202f20485454502f312e310d0a486f73743a20666978747572652e6578616d706c652e636f6d0d0a0d0a",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "VLESS whole-message control",
+          "bytes": 7,
+          "hex": "000048454c4c4f",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "VLESS split WS protocol header",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "Trojan whole-message control",
+          "bytes": 5,
+          "hex": "48454c4c4f",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "Trojan split WS protocol header",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "VLESS full earlydata control",
+          "bytes": 7,
+          "hex": "000048454c4c4f",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "VLESS 8-byte earlydata + WS remainder",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "VLESS 18-byte earlydata + WS remainder",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC whole-Hunk control",
+          "status": 200,
+          "bytes": 21,
+          "hex": "00000000040a02000000000000070a0548454c4c4f",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "gRPC VLESS header split between Hunks",
+          "status": 200,
+          "bytes": 0,
+          "hex": "",
+          "done": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC Trojan header split between Hunks",
+          "status": 200,
+          "bytes": 0,
+          "hex": "",
+          "done": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC upload EOF before delayed destination reply",
+          "status": 200,
+          "bytes": 9,
+          "hex": "00000000040a020000",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "XHTTP upload EOF before delayed destination reply",
+          "status": 200,
+          "bytes": 16,
+          "hex": "000044454c415920726573706f6e7365",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "vless UDP second query after persistent DNS response",
+          "first": {
+            "bytes": 16,
+            "hex": "0000000c234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "beforeClosingDNS": {
+            "frames": 1,
+            "bytes": 16,
+            "hex": "0000000c234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "afterClosingDNS": {
+            "frames": 2,
+            "bytes": 30,
+            "hex": "0000000c234501000000000000000000000c234601000000000000000000",
+            "closed": false,
+            "dials": 2
+          }
+        },
+        {
+          "name": "trojan UDP second query after persistent DNS response",
+          "first": {
+            "bytes": 23,
+            "hex": "01080808080035000c0d0a234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "beforeClosingDNS": {
+            "frames": 1,
+            "bytes": 23,
+            "hex": "01080808080035000c0d0a234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "afterClosingDNS": {
+            "frames": 2,
+            "bytes": 46,
+            "hex": "01080808080035000c0d0a23450100000000000000000001080808080035000c",
+            "closed": false,
+            "dials": 2
+          }
+        },
+        {
+          "name": "vless UDP DNS frame split after first length byte",
+          "frames": 0,
+          "bytes": 0,
+          "hex": "",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "SS destination header split across authenticated AEAD records",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        }
+      ]
+    },
+    {
+      "version": "upstream",
+      "cases": [
+        {
+          "name": "VLESS valid HTTP first payload with CRLF at bytes 56/57",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC VLESS valid HTTP with CRLF at bytes 56/57",
+          "status": 200,
+          "bytes": 0,
+          "hex": "",
+          "done": true,
+          "dials": 0
+        },
+        {
+          "name": "XHTTP VLESS valid HTTP with CRLF at bytes 56/57 control",
+          "status": 200,
+          "bytes": 47,
+          "hex": "0000474554202f20485454502f312e310d0a486f73743a20666978747572652e6578616d706c652e636f6d0d0a0d0a",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "VLESS whole-message control",
+          "bytes": 7,
+          "hex": "000048454c4c4f",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "VLESS split WS protocol header",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "Trojan whole-message control",
+          "bytes": 5,
+          "hex": "48454c4c4f",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "Trojan split WS protocol header",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "VLESS full earlydata control",
+          "bytes": 7,
+          "hex": "000048454c4c4f",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "VLESS 8-byte earlydata + WS remainder",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "VLESS 18-byte earlydata + WS remainder",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC whole-Hunk control",
+          "status": 200,
+          "bytes": 21,
+          "hex": "00000000040a02000000000000070a0548454c4c4f",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "gRPC VLESS header split between Hunks",
+          "status": 200,
+          "bytes": 0,
+          "hex": "",
+          "done": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC Trojan header split between Hunks",
+          "status": 200,
+          "bytes": 0,
+          "hex": "",
+          "done": true,
+          "dials": 0
+        },
+        {
+          "name": "gRPC upload EOF before delayed destination reply",
+          "status": 200,
+          "bytes": 9,
+          "hex": "00000000040a020000",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "XHTTP upload EOF before delayed destination reply",
+          "status": 200,
+          "bytes": 16,
+          "hex": "000044454c415920726573706f6e7365",
+          "done": true,
+          "dials": 1
+        },
+        {
+          "name": "vless UDP second query after persistent DNS response",
+          "first": {
+            "bytes": 16,
+            "hex": "0000000c234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "beforeClosingDNS": {
+            "frames": 1,
+            "bytes": 16,
+            "hex": "0000000c234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "afterClosingDNS": {
+            "frames": 2,
+            "bytes": 30,
+            "hex": "0000000c234501000000000000000000000c234601000000000000000000",
+            "closed": false,
+            "dials": 2
+          }
+        },
+        {
+          "name": "trojan UDP second query after persistent DNS response",
+          "first": {
+            "bytes": 23,
+            "hex": "01080808080035000c0d0a234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "beforeClosingDNS": {
+            "frames": 1,
+            "bytes": 23,
+            "hex": "01080808080035000c0d0a234501000000000000000000",
+            "closed": false,
+            "dials": 1
+          },
+          "afterClosingDNS": {
+            "frames": 2,
+            "bytes": 46,
+            "hex": "01080808080035000c0d0a23450100000000000000000001080808080035000c",
+            "closed": false,
+            "dials": 2
+          }
+        },
+        {
+          "name": "vless UDP DNS frame split after first length byte",
+          "frames": 0,
+          "bytes": 0,
+          "hex": "",
+          "closed": false,
+          "dials": 1
+        },
+        {
+          "name": "SS destination header split across authenticated AEAD records",
+          "bytes": 0,
+          "hex": "",
+          "closed": true,
+          "dials": 0
+        }
+      ]
+    }
+  ]
+}

@@ -92,14 +92,19 @@ async function dnsResponse(request) {
   }
   offset++;
   const name = labels.join('.'), type = query.readUInt16BE(offset);
-  const allowed = ['a.proxy.fixture', 'txt.proxy.fixture', 'explicit-txt.proxy.fixture', 'a.tp443.proxy.fixture'];
+  const allowed = ['a.proxy.fixture', 'txt.proxy.fixture', 'explicit-txt.proxy.fixture', 'a.tp443.proxy.fixture', 'stall-txt.proxy.fixture'];
   if (!allowed.includes(name)) {
     unexpectedFetches.push(`${request.url} ${name} ${type}`);
     return new Response('Unknown DNS fixture', { status: 599 });
   }
   dnsRequests.push({ name, type });
+  if (name === 'stall-txt.proxy.fixture' && type === 16) {
+    // Headers arrive but the DNS body never completes. The production timeout
+    // must cancel body consumption and allow the parallel A answer to be used.
+    return new Response(new ReadableStream({ start() {} }), { headers: { 'Content-Type': 'application/dns-message' } });
+  }
   let data;
-  if (type === 1 && ['a.proxy.fixture', 'a.tp443.proxy.fixture'].includes(name)) data = Buffer.from([192, 0, 2, 44]);
+  if (type === 1 && ['a.proxy.fixture', 'a.tp443.proxy.fixture', 'stall-txt.proxy.fixture'].includes(name)) data = Buffer.from([192, 0, 2, 44]);
   if (type === 16 && name.includes('txt.')) {
     const text = Buffer.from(name === 'explicit-txt.proxy.fixture' ? `${proxyAddress}:443` : proxyAddress);
     data = Buffer.concat([Buffer.from([text.length]), text]);
@@ -301,3 +306,9 @@ for (const targetPort of [443, 8443]) {
     } finally { try { ws.close(); } catch {} }
   });
 }
+
+test('a stalled TXT response body cannot block a healthy parallel A-record fallback indefinitely', { timeout: 10000 }, async () => {
+  const start = Date.now();
+  await headTwice('stall-txt.proxy.fixture', 80);
+  assert.ok(Date.now() - start < 7000, 'The production DoH deadline must bound the lookup before HTTP forwarding');
+});

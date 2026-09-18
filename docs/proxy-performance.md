@@ -1,6 +1,6 @@
-# 代理连接与测速说明（v1.0.6）
+# 代理连接与测速说明（v1.0.7）
 
-基于 `cmliu/edgetunnel` 的 `448a83ced00a43c1d892d5ecbed86a26ea9eeaff`，在保留转发队列、合包、回退策略和代理握手实现的基础上，修复额外等待与请求串扰。
+基于 `cmliu/edgetunnel` 的 `448a83ced00a43c1d892d5ecbed86a26ea9eeaff`，保留转发队列、合包与主要回退策略，修复握手、路由、额外等待与请求串扰。v1.0.7 的完整对照和仍未解决的传输限制见 [代理深度排查](proxy-deep-audit.md)。以下公网样本属于本轮修复前的部署，不是 v1.0.7 的线上验收。
 
 ## v1.0.6：Clash Verge 手动测速的 HTTP 400
 
@@ -57,7 +57,7 @@ v1.0.5 删除这项特殊处理。VLESS / Trojan 的 WS、gRPC、XHTTP 以及 Sh
 
 ## 在 Clash Verge 验收
 
-1. 用构建后的完整 `dist/_worker.js` 或 `dist/brclio-edge-pages.zip` 更新部署；不要只复制 `src/worker.js`。核对后台版本为 `1.0.6`，然后更新客户端订阅。
+1. 用构建后的完整 `dist/_worker.js` 或 `dist/brclio-edge-pages.zip` 更新部署；不要只复制 `src/worker.js`。核对后台版本为 `1.0.7`，然后更新客户端订阅。
 2. 对照原版 / 旧版时固定入口 IP、端口、协议、节点路径中的 ProxyIP 或链式出口；保持 Clash Verge 的测试 URL、统一延迟开关、DNS 和网络环境一致。
 3. 选固定节点交替测几轮，分开记录首次和后续请求、失败次数、延迟中位数；避免同时测试大量节点把本地网络占满。
 4. 另选固定目标文件，在同一出口下有限次下载，记录耗时和实际收到的字节。延迟的 ms 与吞吐量的 Mbps / MB/s 是不同指标。
