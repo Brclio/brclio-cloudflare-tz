@@ -36,7 +36,7 @@ await build({
     b.onResolve({ filter: /^brclio:source$/ }, () => ({ path: 'source', namespace: 'brclio-source' }));
     b.onLoad({ filter: /.*/, namespace: 'brclio-source' }, () => ({ contents: 'export default "__BRCLIO_SOURCE_TEXT_SLOT__";', loader: 'js' }));
   } }],
-  banner: { js: `/* Brclio Edge ${version} | Modified 2026-09-17 by Brclio | Based on cmliu/edgetunnel 448a83ced00a43c1d892d5ecbed86a26ea9eeaff | GPL-2.0-only. See LICENSE and THIRD_PARTY_NOTICES.md. */` }
+  banner: { js: `/* Brclio Edge ${version} | Modified 2026-09-18 by Brclio | Based on cmliu/edgetunnel 448a83ced00a43c1d892d5ecbed86a26ea9eeaff | GPL-2.0-only. See LICENSE and THIRD_PARTY_NOTICES.md. */` }
 });
 // Keep the exact deployed source available to the authenticated download API.
 // A single source-template slot avoids any network dependency or stale binary.

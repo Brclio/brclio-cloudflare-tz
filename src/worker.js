@@ -1,14 +1,16 @@
 /*
- * Brclio Edge — modified 2026-09-17 by Brclio.
+ * Brclio Edge — modified 2026-09-18 by Brclio.
  * Based on cmliu/edgetunnel 448a83ced00a43c1d892d5ecbed86a26ea9eeaff.
  * GPL-2.0-only. Original tunnel implementation and contributor credits retained.
  * Changes: local UI, signed sessions, protected mutations, configuration validation,
  * request-scoped config, redacted logs, official Cloudflare TCP connector,
- * persisted proxy whitelist routing, consistent ALPN in node links.
+ * persisted proxy whitelist routing, consistent ALPN in node links,
+ * conditional policy reads, request-scoped dial settings, real probe forwarding.
  * See LICENSE and THIRD_PARTY_NOTICES.md.
  */
 import { connect } from 'cloudflare:sockets';
 import { decodeHunk } from './grpc.js';
+import { dialSettings, withTimeout } from './tunnel-runtime.js';
 import { handleAdminTool } from './admin-tools.js';
 import { deploymentDownload } from './downloads.js';
 import { DEFAULT_PROXY_WHITELIST, defaultProxyWhitelist, loadProxyWhitelist, matchesProxyWhitelist } from './proxy-whitelist.js';
@@ -19,7 +21,6 @@ let 调试日志打印 = false;
 const WS早期数据最大字节 = 8 * 1024, WS早期数据最大头长度 = Math.ceil(WS早期数据最大字节 * 4 / 3) + 4;
 const 上行合包目标字节 = 20 * 1024, 上行队列最大字节 = 16 * 1024 * 1024, 上行队列最大条目 = 4096;
 const 下行Grain包字节 = 32 * 1024, 下行Grain尾部阈值 = 512, 下行Grain低水位字节 = Math.max(4096, 下行Grain尾部阈值 * 12), 下行Grain最大等待轮次 = 4;
-let TCP并发拨号数 = 2, 反代并发拨号数 = 1, 预加载竞速拨号 = false;
 ///////////////////////////////////////////////////////查杀特征码///////////////////////////////////////////////
 const 特征码字典 = [
 	(Proxy.name + "IP").toUpperCase(),
@@ -55,10 +56,7 @@ const worker = {
 		const host = hosts[0];
 		const 访问路径 = url.pathname.slice(1).toLowerCase();
 		调试日志打印 = ['1', 'true'].includes(env.DEBUG) || 调试日志打印;
-		预加载竞速拨号 = ['1', 'true'].includes(env.PRELOAD_RACE_DIAL) || 预加载竞速拨号;
-		反代并发拨号数 = Math.max(1, Number(env.PROXY_CONCURRENT_DIAL) || 反代并发拨号数);
-		TCP并发拨号数 = Math.max(1, Number(env.TCP_CONCURRENT_DIAL) || TCP并发拨号数);
-		if (!env.TCP_CONCURRENT_DIAL && TCP并发拨号数 !== 1 && 识别运营商(request) === 'cmcc') TCP并发拨号数 = 1;
+		const 拨号配置 = dialSettings(env, 识别运营商(request));
 		let 默认反代IP = (`${(request.cf?.colo || 'LOCAL')}.${特征码字典[0]}.${特征码字典[1]}SsSs.nEt`).toLowerCase(), 默认反代兜底 = true;
 		if (env.PROXYIP) {
 			const proxyIPs = await 整理成数组(env.PROXYIP);
@@ -81,12 +79,15 @@ const worker = {
 			}
 		} else if (管理员密码 && upgradeHeader === 'websocket') {// WebSocket代理
 			const 反代上下文 = await 反代参数获取(url, userID, 默认反代IP, 默认反代兜底);
-			反代上下文.代理白名单 = await loadProxyWhitelist(env);
+			反代上下文.拨号配置 = 拨号配置;
+			// Direct/ProxyIP and global-chain routes never consult the whitelist.
+			if (反代上下文.代理类型 && !反代上下文.代理全局) 反代上下文.代理白名单 = await loadProxyWhitelist(env);
 			log(`[WebSocket] 命中请求: ${url.pathname}${url.search}`);
 			return await 处理WS请求(request, userID, url, 反代上下文);
 		} else if (管理员密码 && !访问路径.startsWith('admin/') && 访问路径 !== 'login' && request.method === 'POST') {// gRPC/叉HTTP代理
 			const 反代上下文 = await 反代参数获取(url, userID, 默认反代IP, 默认反代兜底);
-			反代上下文.代理白名单 = await loadProxyWhitelist(env);
+			反代上下文.拨号配置 = 拨号配置;
+			if (反代上下文.代理类型 && !反代上下文.代理全局) 反代上下文.代理白名单 = await loadProxyWhitelist(env);
 			const { 头: 本机Padding头, 键: 本机Padding键 } = 获取叉HTTPPadding标识(userID);
 			const 命中叉HTTP特征 = !!request.headers.get(本机Padding头) || !!url.searchParams.get(本机Padding键);
 			if (!命中叉HTTP特征 && contentType.startsWith('application/grpc')) {
@@ -131,7 +132,7 @@ const worker = {
                             if (input.port) url.searchParams.set('port', String(input.port));
                         }
                     }
-                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.4', upstreamVersion: Version, kv: true });
+                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.5', upstreamVersion: Version, kv: true });
                     if (request.method === 'POST' && ['admin/cf.json', 'admin/tg.json'].includes(访问路径)) return saveCredentials(request, env, 访问路径 === 'admin/cf.json' ? 'cf' : 'tg');
                     if (访问路径 === 'admin/init' && request.method !== 'POST') return json({ error: '重置配置需要 POST' }, 405, { Allow: 'POST' });
                     if (request.method === 'GET' && 区分大小写访问路径 === 'admin/ADD.txt') {
@@ -602,17 +603,6 @@ async function 处理叉HTTP请求(request, yourUUID, 反代上下文 = {}) {
 	if (!首包) {
 		try { reader.releaseLock() } catch (e) { }
 		return new Response('Invalid request', { status: 400 });
-	}
-	if (isSpeedTestSite(首包.hostname) && 反代上下文.代理类型 === null) {
-		try { reader.releaseLock() } catch (e) { }
-		return new Response(构造本地204响应(首包.respHeader), {
-			status: 200,
-			headers: {
-				'Content-Type': 'application/octet-stream',
-				'X-Accel-Buffering': 'no',
-				'Cache-Control': 'no-store'
-			}
-		});
 	}
 	if (首包.isUDP && 首包.协议 !== 'trojan' && 首包.port !== 53) {
 		try { reader.releaseLock() } catch (e) { }
@@ -1167,10 +1157,6 @@ async function 处理gRPC请求(request, yourUUID, 反代上下文 = {}) {
 								if (解析结果?.hasError) throw new Error(解析结果.message || 'Invalid trojan request');
 								const { port, hostname, rawClientData, isUDP } = 解析结果;
 								log(`[gRPC] 木马首包: ${hostname}:${port} | UDP: ${isUDP ? '是' : '否'}`);
-								if (isSpeedTestSite(hostname) && 反代上下文.代理类型 === null) {
-									grpcBridge.send(构造本地204响应());
-									return;
-								}
 								if (isUDP) {
 									isDnsQuery = true;
 									木马UDP上下文.目标主机 = hostname;
@@ -1187,10 +1173,6 @@ async function 处理gRPC请求(request, yourUUID, 反代上下文 = {}) {
 								const { port, hostname, version, isUDP, rawClientData } = 解析结果;
 								log(`[gRPC] 魏烈思首包: ${hostname}:${port} | UDP: ${isUDP ? '是' : '否'}`);
 								const respHeader = new Uint8Array([version, 0]);
-								if (isSpeedTestSite(hostname) && 反代上下文.代理类型 === null) {
-									grpcBridge.send(构造本地204响应(respHeader));
-									return;
-								}
 								if (isUDP) {
 									if (port !== 53) throw new Error('UDP is not supported');
 									isDnsQuery = true;
@@ -1293,53 +1275,6 @@ async function 处理WS请求(request, yourUUID, url, 反代上下文 = {}) {
 	let WS显式队列字节 = 0, WS显式队列条目 = 0;
 	let 判断协议类型 = null, 当前写入Socket = null, 远端写入器 = null;
 	let ss上下文 = null, ss初始化任务 = null;
-	let WS本地测速模式 = false, WS本地测速回包Socket = null;
-	let WS本地测速请求缓存 = new Uint8Array(0);
-	let WS本地测速首包响应头 = null;
-	const WS本地测速请求上限 = 64 * 1024;
-
-	const 发送WS本地测速响应 = async () => {
-		if (!WS本地测速回包Socket) return;
-		const respHeader = WS本地测速首包响应头;
-		WS本地测速首包响应头 = null;
-		await WebSocket发送并等待(WS本地测速回包Socket, 构造WS本地204响应(respHeader));
-	};
-
-	const 查找HTTP请求头结尾 = (data) => {
-		for (let i = 0; i <= data.byteLength - 4; i++) {
-			if (data[i] === 0x0d && data[i + 1] === 0x0a && data[i + 2] === 0x0d && data[i + 3] === 0x0a) return i + 4;
-		}
-		return -1;
-	};
-
-	const 处理WS本地测速数据 = async (data) => {
-		const chunk = 数据转Uint8Array(data);
-		if (!chunk.byteLength) return;
-		if (WS本地测速请求缓存.byteLength + chunk.byteLength > WS本地测速请求上限) throw new Error('WS local speed-test request is too large');
-		WS本地测速请求缓存 = 拼接字节数据(WS本地测速请求缓存, chunk);
-
-		while (WS本地测速请求缓存.byteLength) {
-			const headerEnd = 查找HTTP请求头结尾(WS本地测速请求缓存);
-			if (headerEnd === -1) return;
-			const headerText = 魏烈思文本解码器.decode(WS本地测速请求缓存.subarray(0, headerEnd));
-			const contentLengthMatch = headerText.match(/(?:^|\r\n)content-length\s*:\s*(\d+)/i);
-			const contentLength = contentLengthMatch ? Number(contentLengthMatch[1]) : 0;
-			const requestLength = headerEnd + contentLength;
-			if (!Number.isSafeInteger(contentLength) || requestLength > WS本地测速请求上限) throw new Error('WS local speed-test request body is too large');
-			if (WS本地测速请求缓存.byteLength < requestLength) return;
-			WS本地测速请求缓存 = WS本地测速请求缓存.slice(requestLength);
-			await 发送WS本地测速响应();
-		}
-	};
-
-	const 启用WS本地测速模式 = async (回包Socket, respHeader = null, 首请求数据 = null) => {
-		WS本地测速模式 = true;
-		WS本地测速回包Socket = 回包Socket;
-		WS本地测速请求缓存 = new Uint8Array(0);
-		WS本地测速首包响应头 = respHeader;
-		if (有效数据长度(首请求数据) > 0) await 处理WS本地测速数据(首请求数据);
-	};
-
 	const 释放远端写入器 = () => {
 		if (远端写入器) {
 			try { 远端写入器.releaseLock() } catch (e) { }
@@ -1562,10 +1497,6 @@ async function 处理WS请求(request, yourUUID, url, 反代上下文 = {}) {
 			throw err;
 		}
 		for (const 明文块 of 明文块数组) {
-			if (WS本地测速模式) {
-				await 处理WS本地测速数据(明文块);
-				continue;
-			}
 			let 已写入 = false;
 			try {
 				已写入 = await 写入远端(明文块, false);
@@ -1608,10 +1539,6 @@ async function 处理WS请求(request, yourUUID, url, 反代上下文 = {}) {
 			const port = (明文数据[cursor] << 8) | 明文数据[cursor + 1];
 			cursor += 2;
 			const rawClientData = 明文数据.subarray(cursor);
-			if (isSpeedTestSite(hostname) && 反代上下文.代理类型 === null) {
-				await 启用WS本地测速模式(上下文.回包Socket, null, rawClientData);
-				return;
-			}
 			上下文.首包已建立 = true;
 			上下文.目标主机 = hostname;
 			上下文.目标端口 = port;
@@ -1627,10 +1554,6 @@ async function 处理WS请求(request, yourUUID, url, 反代上下文 = {}) {
 		}
 		if (判断协议类型 === 'ss') {
 			await 处理SS数据(chunk);
-			return;
-		}
-		if (WS本地测速模式) {
-			await 处理WS本地测速数据(chunk);
 			return;
 		}
 		if (await 写入远端(chunk)) return;
@@ -1655,10 +1578,6 @@ async function 处理WS请求(request, yourUUID, url, 反代上下文 = {}) {
 			const 解析结果 = 解析木马请求(chunk, yourUUID);
 			if (解析结果?.hasError) throw new Error(解析结果.message || 'Invalid trojan request');
 			const { port, hostname, rawClientData, isUDP } = 解析结果;
-			if (isSpeedTestSite(hostname) && 反代上下文.代理类型 === null) {
-				await 启用WS本地测速模式(serverSock, null, rawClientData);
-				return;
-			}
 			if (isUDP) {
 				isDnsQuery = true;
 				木马UDP上下文.目标主机 = hostname;
@@ -1676,10 +1595,6 @@ async function 处理WS请求(request, yourUUID, url, 反代上下文 = {}) {
 			if (解析结果?.hasError) throw new Error(解析结果.message || 'Invalid 魏烈思 request');
 			const { port, hostname, version, isUDP, rawClientData } = 解析结果;
 			const respHeader = new Uint8Array([version, 0]);
-			if (isSpeedTestSite(hostname) && 反代上下文.代理类型 === null) {
-				await 启用WS本地测速模式(serverSock, respHeader, rawClientData);
-				return;
-			}
 			if (isUDP) {
 				if (port === 53) isDnsQuery = true;
 				else throw new Error('UDP is not supported');
@@ -2154,6 +2069,7 @@ async function SSAEAD解密(cryptoKey, nonceCounter, ciphertext) {
 }
 
 async function forwardataTCP(host, portNum, rawData, ws, respHeader, remoteConnWrapper, yourUUID, request = null, 反代上下文 = {}, 允许木马反代 = false, 木马反代首包数据 = null, 仅建立连接 = false) {
+	const { tcpConcurrency: TCP并发拨号数, proxyConcurrency: 反代并发拨号数, preloadRace: 预加载竞速拨号 } = 反代上下文.拨号配置 || dialSettings();
 	const ctx反代IP = 反代上下文.反代IP || '';
 	const ctx代理类型 = 反代上下文.代理类型 !== undefined ? 反代上下文.代理类型 : null;
 	const ctx代理全局 = 反代上下文.代理全局 !== undefined ? 反代上下文.代理全局 : false;
@@ -2201,10 +2117,7 @@ async function forwardataTCP(host, portNum, rawData, ws, respHeader, remoteConnW
 	};
 
 	async function 等待连接建立(remoteSock, timeoutMs = 连接超时毫秒) {
-		await Promise.race([
-			remoteSock.opened,
-			new Promise((_, reject) => setTimeout(() => reject(new Error('连接超时')), timeoutMs))
-		]);
+		await withTimeout(remoteSock.opened, timeoutMs, '连接超时');
 	}
 
 	async function 打开TCP连接(address, port) {
@@ -3078,43 +2991,6 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, is
 	if (!当前连接仍有效()) return;
 	if (readError) log(`[TCP下行] 读取失败: ${readError?.message || readError}`);
 	closeSocketQuietly(webSocket);
-}
-
-function isSpeedTestSite(hostname) {
-	const speedTestDomains = ['speed.cloudflare.com', 'cp.cloudflare.com'];
-	hostname = hostname.toLowerCase();
-	return speedTestDomains.some(domain => hostname === domain || hostname.endsWith('.' + domain));
-}
-
-function 构造本地204响应(respHeader = null) {
-	const 本地204响应 = new TextEncoder().encode(
-		'HTTP/1.1 204 No Content\r\n' +
-		'Content-Length: 0\r\n' +
-		'Connection: close\r\n' +
-		'\r\n'
-	);
-	if (有效数据长度(respHeader) === 0) return 本地204响应;
-	const 协议响应头 = 数据转Uint8Array(respHeader);
-	const response = new Uint8Array(协议响应头.byteLength + 本地204响应.byteLength);
-	response.set(协议响应头, 0);
-	response.set(本地204响应, 协议响应头.byteLength);
-	log(`[TCP转发] 构造本地204响应: ${response.byteLength}B`);
-	return response;
-}
-
-function 构造WS本地204响应(respHeader = null) {
-	const WS本地204响应 = new TextEncoder().encode(
-		'HTTP/1.1 204 No Content\r\n' +
-		'Content-Length: 0\r\n' +
-		'Connection: keep-alive\r\n' +
-		'\r\n'
-	);
-	if (有效数据长度(respHeader) === 0) return WS本地204响应;
-	const 协议响应头 = 数据转Uint8Array(respHeader);
-	const response = new Uint8Array(协议响应头.byteLength + WS本地204响应.byteLength);
-	response.set(协议响应头, 0);
-	response.set(WS本地204响应, 协议响应头.byteLength);
-	return response;
 }
 
 ///////////////////////////////////////////////////////SOCKS5/HTTP函数///////////////////////////////////////////////
@@ -4036,18 +3912,6 @@ const TURN_STUN_ATTR = {
 	XOR_PEER_ADDRESS: 0x0012, REALM: 0x0014, NONCE: 0x0015,
 	REQUESTED_TRANSPORT: 0x0019, CONNECTION_ID: 0x002a
 };
-
-async function withTimeout(promise, timeoutMs, message) {
-	let timer;
-	try {
-		return await Promise.race([
-			promise,
-			new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), timeoutMs) })
-		]);
-	} finally {
-		clearTimeout(timer);
-	}
-}
 
 function isIPv4(value) {
 	const parts = String(value || '').split('.');

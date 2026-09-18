@@ -14,6 +14,8 @@
 
 从 [GitHub Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) 下载预构建文件即可部署，无需安装 Node.js 或自行构建。下面是 **v1.0.4** 的部署包与教程：
 
+当前 **v1.0.5 源码**新增代理建连优化：按需读取路由白名单、请求独立拨号配置、gRPC 单字段零复制，以及测速域名真实转发。下方 v1.0.4 附件不包含这些改进；本次改动与源码构建后的验收方法见 [代理性能说明](docs/proxy-performance.md)。
+
 | 下载文件 | 用途 |
 | --- | --- |
 | [brclio-edge-pages.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.4/brclio-edge-pages.zip) | 推荐：直接上传到 Cloudflare Pages 的拖放部署入口 |
@@ -48,7 +50,7 @@
 - **订阅输出**：通用 / Base64、Clash / Mihomo、sing-box、Surge、Quantumult X、Loon；部分格式使用配置的外部转换服务。
 - **配置维护**：常用字段表单、完整 JSON 编辑、导入导出，以及登录后的当前 Worker / Pages ZIP 下载。
 
-进阶配置使用同一份主配置，支持分组还原未保存的修改。保存后更新客户端订阅；Cloudflare 的环境变量仍在部署设置中修改。代理白名单现由每次隧道请求读取，`GO2SOCKS5` 继续作为强制附加规则；生产 KV 的传播遵循 Cloudflare 一致性机制。
+进阶配置使用同一份主配置，支持分组还原未保存的修改。保存后更新客户端订阅；Cloudflare 的环境变量仍在部署设置中修改。只有使用非全局链式代理的隧道才读取代理白名单，直连 / ProxyIP 和全局链式代理跳过这次 KV 等待；`GO2SOCKS5` 继续作为强制附加规则，生产 KV 的传播遵循 Cloudflare 一致性机制。
 
 v1.0.4 对照在线管理页补齐首页请求用量、三种认证方式与保存前验证，并新增 TOKEN / UUID / 地址 / ECH / 代理路由帮助。用量查询失败不会显示成零；需先在设置中接入自己的只读凭据。
 
