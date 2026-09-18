@@ -132,7 +132,7 @@ const worker = {
                             if (input.port) url.searchParams.set('port', String(input.port));
                         }
                     }
-                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.5', upstreamVersion: Version, kv: true });
+                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.6', upstreamVersion: Version, kv: true });
                     if (request.method === 'POST' && ['admin/cf.json', 'admin/tg.json'].includes(访问路径)) return saveCredentials(request, env, 访问路径 === 'admin/cf.json' ? 'cf' : 'tg');
                     if (访问路径 === 'admin/init' && request.method !== 'POST') return json({ error: '重置配置需要 POST' }, 405, { Allow: 'POST' });
                     if (request.method === 'GET' && 区分大小写访问路径 === 'admin/ADD.txt') {
@@ -455,7 +455,7 @@ const worker = {
 								}
 							}).filter(item => item !== null).join('\n');
 						} else { // 订阅转换
-							const 订阅转换URL = `${config_JSON.订阅转换配置.SUBAPI}/sub?target=${订阅类型}&url=${encodeURIComponent(url.protocol + '//' + url.host + '/sub?target=mixed&token=' + 今日订阅转换后端专属TOKEN + '&cnIspCode=' + 识别运营商(request) + (url.searchParams.has('sub') && url.searchParams.get('sub') != '' ? `&sub=${url.searchParams.get('sub')}` : ''))}&config=${encodeURIComponent(config_JSON.订阅转换配置.SUBCONFIG)}&emoji=${config_JSON.订阅转换配置.SUBEMOJI}&list=${config_JSON.订阅转换配置.SUBLIST}&scv=${config_JSON.跳过证书验证}&xudp=${config_JSON.订阅转换配置.XUDP}&udp=${config_JSON.订阅转换配置.UDP}&tls13=${config_JSON.订阅转换配置.TLS13}&append_type=${config_JSON.订阅转换配置.APPEND_TYPE}&sort=${config_JSON.订阅转换配置.SORT}&expand=${Boolean(config_JSON.订阅转换配置.EXPAND)}`;
+							const 订阅转换URL = `${config_JSON.订阅转换配置.SUBAPI}/sub?target=${订阅类型}&url=${encodeURIComponent(url.protocol + '//' + url.host + '/sub?target=mixed&token=' + 今日订阅转换后端专属TOKEN + '&cnIspCode=' + 识别订阅运营商(request, url) + (url.searchParams.has('sub') && url.searchParams.get('sub') != '' ? `&sub=${url.searchParams.get('sub')}` : ''))}&config=${encodeURIComponent(config_JSON.订阅转换配置.SUBCONFIG)}&emoji=${config_JSON.订阅转换配置.SUBEMOJI}&list=${config_JSON.订阅转换配置.SUBLIST}&scv=${config_JSON.跳过证书验证}&xudp=${config_JSON.订阅转换配置.XUDP}&udp=${config_JSON.订阅转换配置.UDP}&tls13=${config_JSON.订阅转换配置.TLS13}&append_type=${config_JSON.订阅转换配置.APPEND_TYPE}&sort=${config_JSON.订阅转换配置.SORT}&expand=${Boolean(config_JSON.订阅转换配置.EXPAND)}`;
 							try {
 								const response = await fetch(订阅转换URL, { headers: { 'User-Agent': 'Subconverter for ' + 订阅类型 + ' edge' + 'tunnel (https://github.com/' + 特征码字典[1] + '/edge' + 'tunnel)' } });
 								if (response.ok) {
@@ -2303,7 +2303,7 @@ async function forwardataTCP(host, portNum, rawData, ws, respHeader, remoteConnW
 					}
 				} else {
 					log(`[反代连接] 代理到: ${host}:${portNum}`);
-					const 所有反代数组 = await 解析地址端口(ctx反代IP, host, yourUUID);
+					const 所有反代数组 = await 解析地址端口(ctx反代IP, host, yourUUID, portNum);
 					newSocket = await connectProxyIP(`${特征码字典[0]}.tp1.${特征码字典[2]}.xyz`, 1, 本次首包数据, 所有反代数组, ctx反代兜底);
 				}
 				await 安装当前连接(newSocket, 当前连接世代, downlinkDrain);
@@ -5722,10 +5722,16 @@ function 识别运营商(request) {
 	return 命中运营商 || ASN运营商映射[String(cf?.asn || '')] || 'cf';
 }
 
+function 识别订阅运营商(request, url = new URL(request.url)) {
+	// Preserve a user's pool selection through conversion, even when the
+	// converter or subscription request uses an overseas proxy. Dial settings
+	// still use the actual requesting network via 识别运营商.
+	const 查询参数运营商 = String(url.searchParams.get('cnIspCode') || '').trim().toLowerCase();
+	return ['ct', 'cu', 'cmcc', 'cf'].includes(查询参数运营商) ? 查询参数运营商 : 识别运营商(request);
+}
+
 async function 生成随机IP(request, count = 16, 指定端口 = -1) {
-	const url = new URL(request.url);
-	const 查询参数运营商 = String(url.searchParams.get('cnIspCode') || '').toLowerCase();
-	const 运营商文件标识 = ['ct', 'cu', 'cmcc', 'cf'].includes(查询参数运营商) ? 查询参数运营商 : 识别运营商(request);
+	const 运营商文件标识 = 识别订阅运营商(request);
 	const 运营商名称映射 = {
 		cmcc: 'CF移动优选',
 		cu: 'CF联通优选',
@@ -6351,10 +6357,13 @@ function sha224(s) {
 	return hex;
 }
 
-async function 解析地址端口(proxyIP, 目标域名 = 'dash.cloudflare.com', UUID = '00000000-0000-4000-8000-000000000000') {
+async function 解析地址端口(proxyIP, 目标域名 = 'dash.cloudflare.com', UUID = '00000000-0000-4000-8000-000000000000', targetPort = 443) {
 	proxyIP = proxyIP.toLowerCase();
-	function 解析地址端口字符串(str) {
-		let 地址 = str, 端口 = 443;
+	// Plain HTTP must not be sent to an implicit TLS port. Preserve the legacy
+	// default for other destinations and all explicitly configured proxy ports.
+	const 缺省反代端口 = Number(targetPort) === 80 ? 80 : 443;
+	function 解析地址端口字符串(str, 默认端口 = 缺省反代端口) {
+		let 地址 = str, 端口 = 默认端口;
 		if (str.includes(']:')) {
 			const parts = str.split(']:');
 			地址 = parts[0] + ']';
@@ -6367,11 +6376,11 @@ async function 解析地址端口(proxyIP, 目标域名 = 'dash.cloudflare.com',
 		return [地址, 端口];
 	}
 
-	function 解析TXT反代记录(txtData) {
+	function 解析TXT反代记录(txtData, 继承端口) {
 		return txtData.flatMap(data => {
 			if (data.startsWith('"') && data.endsWith('"')) data = data.slice(1, -1);
 			return data.replace(/\\010/g, ',').replace(/\n/g, ',').split(',').map(s => s.trim()).filter(Boolean);
-		}).map(prefix => 解析地址端口字符串(prefix));
+		}).map(prefix => 解析地址端口字符串(prefix, 继承端口));
 	}
 
 	const 反代IP数组 = await 整理成数组(proxyIP);
@@ -6401,7 +6410,7 @@ async function 解析地址端口(proxyIP, 目标域名 = 'dash.cloudflare.com',
 		]);
 
 		const txtData = txtRecords.filter(r => r.type === 16).map(r => (r.data));
-		const txtAddresses = 解析TXT反代记录(txtData);
+		const txtAddresses = 解析TXT反代记录(txtData, 端口);
 		if (txtAddresses.length > 0) {
 			log(`[反代解析] ${地址} 使用TXT记录，共${txtAddresses.length}个结果`);
 			所有反代数组.push(...txtAddresses);

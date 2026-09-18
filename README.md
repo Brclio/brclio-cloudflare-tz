@@ -14,7 +14,7 @@
 
 从 [GitHub Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) 下载预构建文件即可部署，无需安装 Node.js 或自行构建。下面是 **v1.0.4** 的部署包与教程：
 
-当前 **v1.0.5 源码**新增代理建连优化：按需读取路由白名单、请求独立拨号配置、gRPC 单字段零复制，以及测速域名真实转发。下方 v1.0.4 附件不包含这些改进；本次改动与源码构建后的验收方法见 [代理性能说明](docs/proxy-performance.md)。
+当前 **v1.0.6 源码**包含代理建连优化，并修复 v1.0.5 暴露的 HTTP 测速回退端口错误：目标为 HTTP 80 且 ProxyIP 未指定端口时使用 80，避免把明文请求发到 HTTPS 443。另修复指定运营商在 Clash 订阅转换中被覆盖的问题。下方 v1.0.4 附件不包含这些改进；故障复现、实测边界与验收方法见 [代理性能说明](docs/proxy-performance.md)。
 
 | 下载文件 | 用途 |
 | --- | --- |

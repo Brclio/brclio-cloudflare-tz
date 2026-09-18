@@ -1,6 +1,6 @@
 # Worker 与原版的差异
 
-核对日期：2026-09-18；本地源码版本：v1.0.5；上游基线：[cmliu/edgetunnel `448a83c`](https://github.com/cmliu/edgetunnel/blob/448a83ced00a43c1d892d5ecbed86a26ea9eeaff/_worker.js)。核对时上游 main 仍指向此提交。
+核对日期：2026-09-18；本地源码版本：v1.0.6；上游基线：[cmliu/edgetunnel `448a83c`](https://github.com/cmliu/edgetunnel/blob/448a83ced00a43c1d892d5ecbed86a26ea9eeaff/_worker.js)。核对时上游 main 仍指向此提交。
 
 **当前程序沿用原版大部分隧道实现，但不是原版文件完全照搬。** 改动包含实际路由、gRPC 解码、TCP 连接、配置与安全逻辑。不能将它描述为仅更换界面，或保证与原版逐行为等价。
 
@@ -17,6 +17,8 @@
 
 v1.0.5 相对 v1.0.4 的新增是按需读取白名单、请求独立拨号配置、清理 TCP 建连定时器、gRPC 单字段零复制和测速域名真实转发。保持上游默认直连并发 2（移动网络 1）、ProxyIP 并发 1、建连超时 1000 ms；详见 [代理性能说明](proxy-performance.md)。
 
+v1.0.6 修复移除本地 204 后暴露的 HTTP 回退端口错误：无端口 ProxyIP 对目标 80 使用 80，其余目标保持默认 443；显式端口保留，裸 TXT 条目继承父级端口，TXT 自带端口优先。另让显式 `cnIspCode` 参数在 Clash 转换回源中保留。这些是代理与订阅行为修复，不代表带宽已经提升。
+
 ## 应当部署哪个文件
 
 `src/worker.js` 是工程入口，会导入 `panel.js`、`grpc.js`、`proxy-whitelist.js` 等模块，**不能只复制这个源文件到 Workers 编辑器**。
@@ -27,6 +29,6 @@ v1.0.5 相对 v1.0.4 的新增是按需读取白名单、请求独立拨号配�
 
 ## 验证范围
 
-v1.0.5 本地 210 项自动化测试通过，包含 workerd 到本机 TCP / HTTP CONNECT 的实际转发、按需读取 KV、测速域名透传、请求拨号隔离、配置保存和订阅参数检查；构建和 Wrangler dry-run 通过。进阶配置与网络工具的桌面 / 手机浏览器验收为此前版本记录。公网 Cloudflare 边缘、真实客户端速度、外部转换器和真实通知凭据仍需在目标环境验收。
+v1.0.6 本地 225 项自动化测试通过，包含 workerd 到本机 TCP / HTTP CONNECT 的实际转发、按需读取 KV、测速域名透传、HTTP 回退端口、请求拨号隔离、配置保存和订阅参数检查；构建和 Wrangler dry-run 通过。另在现有公网部署间做了固定入口的有限延迟对照并复现 HTTP 400，详见验证记录。进阶配置与网络工具的桌面 / 手机浏览器验收为此前版本记录；v1.0.6 尚未执行 Cloudflare 部署和部署后的客户端验收。
 
 完整功能对照见 [upstream-feature-matrix.md](upstream-feature-matrix.md)，验证记录见 [validation.md](validation.md)。
