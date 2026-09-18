@@ -9,6 +9,7 @@
 - `styles.css`、`app.js`：共享排版和交互。两篇使用独立进度记录。
 - `../tutorial-assets/original/`：9 张本地管理后台原始截图，保持已有字节。
 - `../tutorial-assets/cloudflare/`：28 张用户提供实操截图制作的教学 PNG，已裁切、遮挡账号和凭据、添加编号与箭头。
+- `../tutorial-assets/github/`：12 张 Git 集成实操教学 PNG，来自 2026-09-18 提供的 5120×2704 截图；保留原像素裁剪、编号箭头及中文说明，ADMIN 与 UUID 已遮盖。
 - `../../scripts/build-tutorial.mjs`：生成两篇可离线阅读的 HTML，以及各自构建清单。
 
 ```sh
@@ -26,6 +27,13 @@ npm run build:tutorial
 账号、ADMIN、UUID 等在教学 PNG 中不透明遮挡或由裁切彻底移除。**含凭据的原始截图不得复制进仓库、HTML、SVG、打包产物或公开下载。** 清单只记录来源文件名、尺寸、SHA-256、裁切、遮挡与标注信息；阅读时仅使用处理后的 PNG。不要用可被关闭的 HTML 遮挡层代替图片像素中的遮挡。
 
 `../../scripts/prepare-cloudflare-screenshots.mjs` 记录了素材制作流程。该脚本只在重新制作教学图时使用；普通构建与阅读不需要原始截图或浏览器工具。更换教学 PNG 后，同步更新 `cloudflare-captures.json` 的尺寸、字节数与 SHA-256，再运行教程构建。
+
+Git 篇的 12 张新图另由 `github-captures.json` 记录，裁剪和标注位置在 `../../scripts/github-screenshot-specs.mjs` 中。重新制作时运行下面的命令；原始截图目录由维护者在本地提供，不进入仓库。成功提示图省略中间的后续步骤面板，KV 表单省略中间空白，两张图均明确标出拼接间隔。
+
+```sh
+node scripts/prepare-cloudflare-screenshots.mjs --set github --source-dir /path/to/captures
+npm run build:tutorial
+```
 
 已有 9 张后台原图仍遵循原有无后处理流程：在本地运行页面中使用原生凭据遮盖控件，等待界面稳定后保存视口 PNG，更新 `local-captures.json`。新图和旧图的处理方式分别记录，不将标注图称为未经处理的原始截图。
 

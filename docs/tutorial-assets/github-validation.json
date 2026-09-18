@@ -1,0 +1,349 @@
+{
+  "date": "2026-09-18",
+  "scope": "12 user-supplied Git deployment captures integrated into github-deploy.html, plus shared image-viewer keyboard endpoint fix. No Cloudflare account changes or deployment performed.",
+  "artifacts": [
+    {
+      "file": "docs/github-deploy.html",
+      "bytes": 3129388,
+      "sha256": "8c508a5477184b008ab807b70d9bea5e71adb6206de6e38f8dd1cd4f6f4fbe7c"
+    },
+    {
+      "file": "docs/tutorial.html",
+      "bytes": 7195155,
+      "sha256": "1d1ef5691e871dc9acc85dda6f8188fbf31920b2e3c958f51107f4ccf3f5a0cf"
+    }
+  ],
+  "screenshots": {
+    "newImages": 12,
+    "totalGitGuideFigures": 14,
+    "sourceDimensions": "5120x2704",
+    "nativePixelCrop": true,
+    "opaqueCredentialRedactions": true,
+    "rawCapturesDistributed": false,
+    "manifest": "github-captures.json",
+    "all12EmbeddedPngHashesMatch": true,
+    "downloadedAdminPngMatchesReviewedAsset": true,
+    "visualReview": "All 12 annotated PNGs inspected; output-directory and branch/status outline overlaps corrected and rechecked."
+  },
+  "browser": {
+    "tool": "Playwright CLI",
+    "checks": [
+      {
+        "name": "14 figures, all 12 new captures, valid anchors and decoded images",
+        "ok": true,
+        "detail": {
+          "duplicates": [],
+          "brokenAnchors": [],
+          "gallery": [
+            "cf-05",
+            "cf-06",
+            "git-01",
+            "git-02",
+            "git-03",
+            "git-04",
+            "git-05",
+            "git-06",
+            "git-07",
+            "git-08",
+            "git-09",
+            "git-10",
+            "git-11",
+            "git-12"
+          ],
+          "images": [
+            {
+              "kind": "annotated",
+              "width": 1165,
+              "height": 1107,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1198,
+              "height": 724,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1858,
+              "height": 1821,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1873,
+              "height": 2619,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1863,
+              "height": 1075,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1863,
+              "height": 1267,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1865,
+              "height": 1068,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1740,
+              "height": 2515,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1045,
+              "height": 1611,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 1045,
+              "height": 1671,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 802,
+              "height": 1030,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 802,
+              "height": 1331,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 2453,
+              "height": 1361,
+              "complete": true
+            },
+            {
+              "kind": "annotated",
+              "width": 2443,
+              "height": 2193,
+              "complete": true
+            }
+          ],
+          "fontLoaded": true
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 1440px; details false",
+        "ok": true,
+        "detail": {
+          "width": 1440,
+          "scrollWidth": 1440
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 1440px; details true",
+        "ok": true,
+        "detail": {
+          "width": 1440,
+          "scrollWidth": 1440
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 900px; details false",
+        "ok": true,
+        "detail": {
+          "width": 900,
+          "scrollWidth": 900
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 900px; details true",
+        "ok": true,
+        "detail": {
+          "width": 900,
+          "scrollWidth": 900
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 390px; details false",
+        "ok": true,
+        "detail": {
+          "width": 390,
+          "scrollWidth": 390
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 390px; details true",
+        "ok": true,
+        "detail": {
+          "width": 390,
+          "scrollWidth": 390
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 320px; details false",
+        "ok": true,
+        "detail": {
+          "width": 320,
+          "scrollWidth": 320
+        }
+      },
+      {
+        "name": "No horizontal page overflow at 320px; details true",
+        "ok": true,
+        "detail": {
+          "width": 320,
+          "scrollWidth": 320
+        }
+      },
+      {
+        "name": "Viewer new capture 1",
+        "ok": true,
+        "detail": "3 / 14 · 1858 × 1821 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 2",
+        "ok": true,
+        "detail": "4 / 14 · 1873 × 2619 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 3",
+        "ok": true,
+        "detail": "5 / 14 · 1863 × 1075 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 4",
+        "ok": true,
+        "detail": "6 / 14 · 1863 × 1267 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 5",
+        "ok": true,
+        "detail": "7 / 14 · 1865 × 1068 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 6",
+        "ok": true,
+        "detail": "8 / 14 · 1740 × 2515 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 7",
+        "ok": true,
+        "detail": "9 / 14 · 1045 × 1611 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 8",
+        "ok": true,
+        "detail": "10 / 14 · 1045 × 1671 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 9",
+        "ok": true,
+        "detail": "11 / 14 · 802 × 1030 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 10",
+        "ok": true,
+        "detail": "12 / 14 · 802 × 1331 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 11",
+        "ok": true,
+        "detail": "13 / 14 · 2453 × 1361 px · 高清标注图"
+      },
+      {
+        "name": "Viewer new capture 12",
+        "ok": true,
+        "detail": "14 / 14 · 2443 × 2193 px · 高清标注图"
+      },
+      {
+        "name": "Last image disables Next",
+        "ok": true
+      },
+      {
+        "name": "Keyboard previous image",
+        "ok": true
+      },
+      {
+        "name": "100% native pixels with scrolling",
+        "ok": true,
+        "detail": {
+          "displayWidth": 2453,
+          "naturalWidth": 2453,
+          "stageWidth": 1390,
+          "scrollWidth": 2493
+        }
+      },
+      {
+        "name": "Escape closes image",
+        "ok": true
+      },
+      {
+        "name": "Download reviewed ADMIN PNG",
+        "ok": true,
+        "detail": "brclio-edge-git-07-annotated.png"
+      },
+      {
+        "name": "Mobile viewer fits viewport",
+        "ok": true,
+        "detail": {
+          "left": 12,
+          "right": 378,
+          "width": 390
+        }
+      },
+      {
+        "name": "Mobile table of contents jumps and closes",
+        "ok": true
+      },
+      {
+        "name": "Offline standalone HTML, all 14 PNGs and font",
+        "ok": true,
+        "detail": {
+          "images": 14,
+          "decoded": true,
+          "font": true,
+          "external": []
+        }
+      },
+      {
+        "name": "No browser errors or external runtime requests",
+        "ok": true,
+        "detail": {
+          "errors": [],
+          "externalRequests": []
+        }
+      },
+      {
+        "name": "tutorial.html keyboard returns from last image",
+        "ok": true
+      },
+      {
+        "name": "tutorial.html keyboard leaves first image",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html keyboard returns from last image",
+        "ok": true
+      },
+      {
+        "name": "github-deploy.html keyboard leaves first image",
+        "ok": true
+      }
+    ],
+    "passed": 34
+  },
+  "staticChecks": [
+    "npm run build:tutorial",
+    "npm run check",
+    "git diff --check",
+    "Existing font subset covers all Git tutorial heading characters"
+  ]
+}

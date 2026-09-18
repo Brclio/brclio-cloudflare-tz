@@ -1,11 +1,11 @@
 {
   "schemaVersion": 2,
   "output": "docs/github-deploy.html",
-  "bytes": 916548,
-  "sha256": "d62518e3a5c26fed9b1019fa666cd0ad2c5e10cfc03253483f27092727310c00",
+  "bytes": 3129388,
+  "sha256": "8c508a5477184b008ab807b70d9bea5e71adb6206de6e38f8dd1cd4f6f4fbe7c",
   "fontSha256": "40620aafdd4de898ff58d5489d022b2518c9fe3d34dbdd2f05cbf8d459193fdf",
-  "figures": 4,
-  "uniqueImages": 4,
+  "figures": 14,
+  "uniqueImages": 14,
   "originalImages": [],
   "annotatedImages": [
     {
@@ -23,18 +23,88 @@
       "sha256": "a901bc4247cc095fdde820d61fc8c61d5f66cd166cf19ffe5f205219e32601ec"
     },
     {
-      "file": "cloudflare/cf-12.png",
-      "width": 3400,
-      "height": 1469,
-      "bytes": 163986,
-      "sha256": "e13a5ee8f2fc07de21209ffdd3fc404b41c972ac06c9fb6a714dd773cfb75239"
+      "file": "github/git-01.png",
+      "width": 1858,
+      "height": 1821,
+      "bytes": 169124,
+      "sha256": "6ea7d0674f0d7498a12ed1191fa005febd2193dbe0c61de3354dd28db4ad0c6c"
     },
     {
-      "file": "cloudflare/cf-17.png",
+      "file": "github/git-02.png",
+      "width": 1873,
+      "height": 2619,
+      "bytes": 256967,
+      "sha256": "8893d841d96758ed65fc7267a3af08751513da744017d9edf3514afd0fd5135b"
+    },
+    {
+      "file": "github/git-03.png",
+      "width": 1863,
+      "height": 1075,
+      "bytes": 76355,
+      "sha256": "98d9fc18741f18327bf3971cbfeba2ce05367158fede8b7108d05576652e0e6b"
+    },
+    {
+      "file": "github/git-04.png",
+      "width": 1863,
+      "height": 1267,
+      "bytes": 191300,
+      "sha256": "cb348b1948b083886304b45381f6fba98ae62cde256a12f1f5fd92d32d85fa02"
+    },
+    {
+      "file": "github/git-05.png",
+      "width": 1865,
+      "height": 1068,
+      "bytes": 118811,
+      "sha256": "dd35fc26d1b3436225722f9d74b588e54c12bafac9e9d95b00ee8737b610f7ba"
+    },
+    {
+      "file": "github/git-06.png",
+      "width": 1740,
+      "height": 2515,
+      "bytes": 262574,
+      "sha256": "fcd6529773a16e4674e6f7f4f31a99bc39c3da847566a25e490f3e29ff721364"
+    },
+    {
+      "file": "github/git-07.png",
+      "width": 1045,
+      "height": 1611,
+      "bytes": 134071,
+      "sha256": "4f559a24029f4835c99f77923e7031a750baf7c85660b6713bd7e9b2eb7173d4"
+    },
+    {
+      "file": "github/git-08.png",
+      "width": 1045,
+      "height": 1671,
+      "bytes": 132980,
+      "sha256": "d4ccad8a48b3aaa48bd191ec04853abdeed4be06d1b58faff9a1c3bdd003f5bd"
+    },
+    {
+      "file": "github/git-09.png",
+      "width": 802,
+      "height": 1030,
+      "bytes": 76638,
+      "sha256": "106183eb4160996507a29014a903897881895775766687e39f4951f97d54a653"
+    },
+    {
+      "file": "github/git-10.png",
       "width": 802,
       "height": 1331,
-      "bytes": 112998,
-      "sha256": "69e9d175ed4c6476ea05ffe0413f1d092945021d8c83c90ba9d7298f79303cae"
+      "bytes": 116645,
+      "sha256": "5b6f2f95a6391e3b34d87bcd6d70ce4c05010699fee0687622b123f3be1e88fa"
+    },
+    {
+      "file": "github/git-11.png",
+      "width": 2453,
+      "height": 1361,
+      "bytes": 184695,
+      "sha256": "db0593b1892e804ef283ee2176c711a575eea9c41b05b54fa5c47bdb9941a6c6"
+    },
+    {
+      "file": "github/git-12.png",
+      "width": 2443,
+      "height": 2193,
+      "bytes": 209862,
+      "sha256": "38422df3f3c617c5aec3049ded0f72f70a4279043cbb1e42f8c6c75fe7a0dd2b"
     }
   ],
   "sourceFiles": [
@@ -44,5 +114,5 @@
     "scripts/build-tutorial.mjs"
   ],
   "selfContained": true,
-  "screenshotProcessing": "Local application PNGs unchanged. User Cloudflare screenshots cropped at native scale, credentials removed and instructional annotations added before embedding. See cloudflare-captures.json."
+  "screenshotProcessing": "Local application PNGs unchanged. User Cloudflare screenshots cropped at native scale, credentials removed and instructional annotations added before embedding. See cloudflare-captures.json. Git integration captures: github-captures.json."
 }

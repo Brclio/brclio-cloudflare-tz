@@ -201,8 +201,15 @@
     if (!image) return;
     if (opening) imageTrigger = button;
     currentImageIndex = gallery.findIndex(item => item.dataset.image === button.dataset.image);
+    const focusedAction = document.activeElement;
     previousImage.disabled = currentImageIndex <= 0;
     nextImage.disabled = currentImageIndex < 0 || currentImageIndex >= gallery.length - 1;
+    // Disabling the focused end-of-gallery button otherwise moves focus to body,
+    // outside the dialog's keyboard navigation handler.
+    if ((focusedAction === previousImage && previousImage.disabled) ||
+        (focusedAction === nextImage && nextImage.disabled)) {
+      $('#image-close').focus({ preventScroll: true });
+    }
     lightboxImg.src = image.src;
     lightboxImg.alt = image.alt;
     lightboxImg.width = image.naturalWidth || image.width;

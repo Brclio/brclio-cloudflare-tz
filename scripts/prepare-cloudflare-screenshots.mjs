@@ -5,6 +5,7 @@
  * to the repository. Opaque credential redactions are baked into final PNGs.
  *
  * Usage: node scripts/prepare-cloudflare-screenshots.mjs --source-dir /path/to/captures
+ * Git guide: add --set github to render the 12 Git integration captures.
  * Optional: PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs
  */
 import fs from 'node:fs/promises';
@@ -13,16 +14,23 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { captureIds as githubCaptureIds, specs as githubSpecs } from './github-screenshot-specs.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceArg = process.argv.indexOf('--source-dir');
 const sourceDir = sourceArg >= 0 ? process.argv[sourceArg + 1] : process.env.CF_SOURCE_DIR || os.tmpdir();
-const outDir = path.join(root, 'docs/tutorial-assets/cloudflare');
-const captureIds = [
+const setArg = process.argv.indexOf('--set');
+const captureSet = setArg >= 0 ? process.argv[setArg + 1] : 'manual';
+if (!['manual', 'github'].includes(captureSet)) throw new Error('Unknown capture set; use manual or github.');
+const github = captureSet === 'github';
+const directory = github ? 'github' : 'cloudflare';
+const prefix = github ? 'git' : 'cf';
+const outDir = path.join(root, 'docs/tutorial-assets', directory);
+const legacyCaptureIds = [
 'a8a89a18-7c88-40bf-83d7-a7b1f6bbc0d5','6e616593-e909-4331-9f86-08cf78fe3607','e6e40858-3156-4dd2-abef-414dc994c607','1a57f3fb-62e7-44c4-a6d8-7f5daa2d752b','15c9fe46-1e1e-4ed7-9440-4a02eac94ed6','3712d564-62c3-4644-a3fd-cbd382cd415f','fe403d48-331c-46bb-b2e5-6f9204ea2aa9','0158c88d-1eb6-452a-83ff-2129dbc84aa2','33ee8fc7-f9b7-4215-b4ec-120fd3b66c3b','9aa8d79a-6bbc-4775-b01b-2bc891d2c01f','87e0dbc0-2bd7-40c1-8502-80be591e8477','62213538-c5d7-4314-9586-838c6b08ef16','b81d9aeb-db29-4c77-9b69-05e6add7808e','7cf95ff4-8495-4e32-a9db-d5d44f1afbe9','fa71cfb8-e9aa-4ff5-8bc8-6f8f6de8b3f3','69d19b05-3f78-42ad-955c-28658e597e0b','8802046c-5fd8-4084-b422-b32442870127','d91a56ea-8ff0-4309-a257-06479de795a1','c9fb68ce-92e2-478f-9eb0-c109f572f833','54178c52-82fa-40ac-a1cf-b2d5636102da','5226d3c3-a8ed-4cf4-bcc9-361ac0636f87','81c08c17-641f-4e89-90d1-1bcb25c26199','e7ea8ab7-c1b3-4fa7-be4b-bc995402da5e','8f7b9e8a-7c6c-49f6-81dc-f1e11888e939','09c83ea3-e0af-4e39-981a-16caa6136864','755ca92d-9b72-46da-be0a-314465af5474','ae8da89f-5ecd-4fb0-874c-238a76e1be30','b522a311-33e4-42bb-ac62-f3e5e8537f4b'];
 // Coordinates below use the 2048px-wide reading reference, scaled to native pixels.
 const a = (text, target, from) => ({ text, target, from });
-const specs = [
+const legacySpecs = [
 {title:'先创建 KV 命名空间',caption:'打开「存储和数据库 → Workers KV」，再点击右上角 Create Instance。',crop:[15,60,1650,550],annotations:[a('进入 Workers KV',[33,465,164,26],[268,494]),a('点击 Create Instance',[1536,76,121,34],[1480,161])]},
 {title:'给 KV 命名空间起名',caption:'命名空间名称可填写 brclio-edge-config。确认名称后点击「创建」。',crop:[863,47,322,211],annotations:[a('填写 brclio-edge-config',[894,165,260,34],[1075,134]),a('点击创建',[1131,220,44,31],[1065,235])]},
 {title:'确认 KV 已创建',caption:'列表出现 brclio-edge-config 即表示命名空间已创建；下一步把它绑定到 Pages 项目。',crop:[587,153,1078,286],annotations:[a('记住这个名称，稍后绑定时选择它',[606,245,154,31],[839,314])]},
@@ -53,6 +61,8 @@ const specs = [
 {title:'重新部署完成，开始验证',caption:'出现成功页面后，打开自己的站点验证登录、配置读取与订阅功能。部署成功本身不等于所有功能都已验证。',crop:[646,67,970,262],annotations:[a('确认出现部署成功提示',[1060,112,132,48],[1252,161]),a('打开自己的站点继续验证',[1030,187,203,30],[911,227])]}
 ];
 
+const captureIds = github ? githubCaptureIds : legacyCaptureIds;
+const specs = github ? githubSpecs : legacySpecs;
 const require = createRequire(import.meta.url);
 let playwright;
 const moduleCandidates = [process.env.PLAYWRIGHT_MODULE, (() => {try{return require.resolve('playwright')}catch{return null}})(),path.join(os.homedir(),'.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')].filter(Boolean);
@@ -78,6 +88,7 @@ crop[3]=Math.min(crop[3],sourceHeight-crop[1]);
 const [cx,cy,width,cropHeight]=crop;
 const segments=(spec.segments||[spec.crop]).map(scale).map(([x,y,w,h])=>[x,y,Math.min(w,sourceWidth-x),Math.min(h,sourceHeight-y)]);
 const segmentGap=spec.segments?76:0;
+const segmentCaption=spec.segmentCaption || '⋯ 中间空白已省略 ⋯';
 const shotHeight=segments.reduce((sum,segment)=>sum+segment[3],0)+segmentGap*(segments.length-1);
 const displayPoint=([x,y])=>{let offset=0;for(const [sx,sy,sw,sh] of segments){if(y>=sy&&y<=sy+sh)return[x-sx,y-sy+offset];offset+=sh+segmentGap;}throw new Error(`Annotation outside visible segments: ${i+1}, ${x}, ${y}`)};
 if(cx<0||cy<0||cx+width>sourceWidth||cy+cropHeight>sourceHeight)throw new Error(`Invalid crop ${i+1}`);
@@ -99,14 +110,14 @@ const dx=tx-fx,dy=ty-fy,len=Math.max(1,Math.hypot(dx,dy)); const r=compact?25:31
 overlays+=`<rect x="${left-4}" y="${top-4}" width="${w+8}" height="${h+8}" rx="12" fill="none" stroke="#d84f32" stroke-width="6"/><path d="M ${fx+dx/len*r} ${fy+dy/len*r} L ${tx} ${ty}" stroke="#d84f32" stroke-width="7" fill="none" marker-end="url(#arrow)"/><circle cx="${fx}" cy="${fy}" r="${r}" fill="#d84f32" stroke="#fff" stroke-width="4"/><text x="${fx}" y="${fy+1}" text-anchor="middle" dominant-baseline="central" fill="white" font-size="${compact?34:40}" font-family="Arial" font-weight="700">${entry.number}</text>`;
 }
 await page.setContent(`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}html,body{margin:0;width:${width}px;background:#fbf7ef;color:#392e25;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.head{height:${header}px;padding:24px 38px;border-bottom:2px solid #e9dfd1;display:flex;gap:25px;align-items:center}.number{font-size:30px;color:#a55138;letter-spacing:2px}.title{font-size:${compact?40:52}px;font-weight:650;line-height:1.3;margin:0}.shot{height:${shotHeight}px;position:relative;background:#fff;overflow:hidden}.shot canvas,.shot svg{display:block;position:absolute;inset:0;width:${width}px;height:${shotHeight}px}.legend{padding:20px 38px 18px;border-top:2px solid #e9dfd1}.hint{display:flex;gap:20px;font-size:${font}px;line-height:1.5;padding:8px 0;align-items:flex-start}.hint b{background:#d84f32;color:#fff;border-radius:50%;font-size:${font-5}px;min-width:${font+13}px;height:${font+13}px;display:flex;align-items:center;justify-content:center;line-height:1;margin-top:4px}.hint span{flex:1} </style><main><header class="head"><span class="number">${String(i+1).padStart(2,'0')}</span><h1 class="title">${escape(spec.title)}</h1></header><section class="shot"><canvas width="${width}" height="${shotHeight}"></canvas><svg viewBox="0 0 ${width} ${shotHeight}" xmlns="http://www.w3.org/2000/svg"><defs><marker id="arrow" markerWidth="26" markerHeight="24" refX="22" refY="12" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L22,12 L0,24 Z" fill="#d84f32"/></marker></defs>${overlays}</svg></section><footer class="legend">${legend}</footer></main>`);
-await page.evaluate(async({data,crop,redactions,segments,segmentGap})=>{const image=new Image();image.src=data;await image.decode();const ctx=document.querySelector('canvas').getContext('2d');const[cx,cy,w,h]=crop;let offset=0;for(const [sx,sy,sw,sh] of segments){if(offset){ctx.fillStyle='#fbf7ef';ctx.fillRect(0,offset,w,segmentGap);ctx.fillStyle='#8a7868';ctx.font='28px "PingFang SC",sans-serif';ctx.textBaseline='middle';ctx.textAlign='center';ctx.fillText('⋯ 中间空白已省略 ⋯',w/2,offset+segmentGap/2);ctx.textAlign='left';offset+=segmentGap;}ctx.drawImage(image,sx,sy,sw,sh,0,offset,sw,sh);offset+=sh;}for(const item of redactions){const[x,y,rw,rh]=item.rect;ctx.fillStyle='#fff';ctx.fillRect(x-cx,y-cy,rw,rh);ctx.fillStyle='#6f6256';ctx.font=`${Math.max(22,Math.round(rh*0.38))}px "PingFang SC",sans-serif`;ctx.textBaseline='middle';ctx.fillText(item.replacement,x-cx+18,y-cy+rh/2);}},{data:`data:image/png;base64,${source.toString('base64')}`,crop,redactions,segments,segmentGap});
+await page.evaluate(async({data,crop,redactions,segments,segmentGap,segmentCaption})=>{const image=new Image();image.src=data;await image.decode();const ctx=document.querySelector('canvas').getContext('2d');const[cx,cy,w,h]=crop;let offset=0;for(const [sx,sy,sw,sh] of segments){if(offset){ctx.fillStyle='#fbf7ef';ctx.fillRect(0,offset,w,segmentGap);ctx.fillStyle='#8a7868';ctx.font='28px "PingFang SC",sans-serif';ctx.textBaseline='middle';ctx.textAlign='center';ctx.fillText(segmentCaption,w/2,offset+segmentGap/2);ctx.textAlign='left';offset+=segmentGap;}ctx.drawImage(image,sx,sy,sw,sh,0,offset,sw,sh);offset+=sh;}for(const item of redactions){const[x,y,rw,rh]=item.rect;ctx.fillStyle='#fff';ctx.fillRect(x-cx,y-cy,rw,rh);ctx.fillStyle='#6f6256';ctx.font=`${Math.max(22,Math.round(rh*0.38))}px "PingFang SC",sans-serif`;ctx.textBaseline='middle';ctx.fillText(item.replacement,x-cx+18,y-cy+rh/2);}},{data:`data:image/png;base64,${source.toString('base64')}`,crop,redactions,segments,segmentGap,segmentCaption});
 await page.evaluate(()=>document.fonts.ready);
 const actualHeight=await page.locator('main').evaluate(el=>Math.ceil(el.getBoundingClientRect().height));
 if(actualHeight!==height)await page.setViewportSize({width,height:actualHeight});
-const name=`cf-${String(i+1).padStart(2,'0')}`,file=`cloudflare/${name}.png`;
+const name=`${prefix}-${String(i+1).padStart(2,'0')}`,file=`${directory}/${name}.png`;
 const png=await page.locator('main').screenshot({path:path.join(outDir,`${name}.png`),type:'png'});
-images.push({file,name,title:spec.title,caption:spec.caption,width,height:png.readUInt32BE(20),bytes:png.length,sha256:hash(png),sourceFile,sourceWidth,sourceHeight,sourceSha256:hash(source),crop,...(spec.segments?{segments,segmentGap}:{}),redactions,annotations});
+images.push({file,name,title:spec.title,caption:spec.caption,width,height:png.readUInt32BE(20),bytes:png.length,sha256:hash(png),sourceFile,sourceWidth,sourceHeight,sourceSha256:hash(source),crop,...(spec.segments?{segments,segmentGap,segmentCaption}:{}),redactions,annotations});
 console.log(`${name}: ${width} × ${images.at(-1).height}, ${Math.round(png.length/1024)} KiB`);
 }
-await fs.writeFile(path.join(root,'docs/tutorial-assets/cloudflare-captures.json'),JSON.stringify({description:'User-supplied Cloudflare UI captures. Native-pixel crops with HTML/SVG teaching overlays; credential redactions are opaque and baked into PNG outputs. No raw source captures are included.',coordinateSpace:'Source-native pixels; crop is [x,y,width,height], annotation targets and redactions use the same source coordinates.',images},null,2)+'\n');
+await fs.writeFile(path.join(root,`docs/tutorial-assets/${github ? 'github' : 'cloudflare'}-captures.json`),JSON.stringify({description:'User-supplied Cloudflare UI captures. Native-pixel crops with HTML/SVG teaching overlays; credential redactions are opaque and baked into PNG outputs. No raw source captures are included.',coordinateSpace:'Source-native pixels; crop is [x,y,width,height], annotation targets and redactions use the same source coordinates.',images},null,2)+'\n');
 } finally {await browser.close();}

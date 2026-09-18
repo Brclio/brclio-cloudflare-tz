@@ -1,0 +1,800 @@
+{
+  "description": "User-supplied Cloudflare UI captures. Native-pixel crops with HTML/SVG teaching overlays; credential redactions are opaque and baked into PNG outputs. No raw source captures are included.",
+  "coordinateSpace": "Source-native pixels; crop is [x,y,width,height], annotation targets and redactions use the same source coordinates.",
+  "images": [
+    {
+      "file": "github/git-01.png",
+      "name": "git-01",
+      "title": "选择自己的 GitHub 仓库",
+      "caption": "先选自己的 GitHub 账号，再选 Fork 后的仓库，点击「开始设置」。图中 Brclio 是作者的账号示例。",
+      "width": 1858,
+      "height": 1821,
+      "bytes": 169124,
+      "sha256": "6ea7d0674f0d7498a12ed1191fa005febd2193dbe0c61de3354dd28db4ad0c6c",
+      "sourceFile": "codex-clipboard-182a9ccd-607c-4d27-b1b8-62b4bb1c567f.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "7a22facbedc95f4ed424c09af886d212903ab7a1ca3b626e393ec74db9cc1c81",
+      "crop": [
+        1895,
+        978,
+        1858,
+        1388
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "账号切换为你自己的 GitHub 账号",
+          "target": [
+            1920,
+            1055,
+            450,
+            78
+          ],
+          "from": [
+            2675,
+            1095
+          ]
+        },
+        {
+          "number": 2,
+          "text": "选中自己的 brclio-cloudflare-tz 仓库",
+          "target": [
+            1920,
+            1400,
+            888,
+            118
+          ],
+          "from": [
+            2673,
+            1270
+          ]
+        },
+        {
+          "number": 3,
+          "text": "点击开始设置，进入构建配置",
+          "target": [
+            3530,
+            2250,
+            193,
+            98
+          ],
+          "from": [
+            3210,
+            2298
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-02.png",
+      "name": "git-02",
+      "title": "逐项核对构建设置",
+      "caption": "项目名称使用自己的可用名称，生产分支为 main。框架选「无」，填写构建命令、输出目录和 NODE_VERSION，再保存并部署。",
+      "width": 1873,
+      "height": 2619,
+      "bytes": 256967,
+      "sha256": "8893d841d96758ed65fc7267a3af08751513da744017d9edf3514afd0fd5135b",
+      "sourceFile": "codex-clipboard-88b29a21-36b0-44a5-9991-c81404ce7daa.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "d6feafc21e0d56450533741f24a0487e3a875c762c887f1ac6cfe745392db4fb",
+      "crop": [
+        1878,
+        525,
+        1873,
+        2028
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "名称可自定；生产分支选 main",
+          "target": [
+            1918,
+            543,
+            1260,
+            360
+          ],
+          "from": [
+            3425,
+            718
+          ]
+        },
+        {
+          "number": 2,
+          "text": "框架选无；命令为 npm ci && npm run build",
+          "target": [
+            1918,
+            1250,
+            693,
+            300
+          ],
+          "from": [
+            3083,
+            1375
+          ]
+        },
+        {
+          "number": 3,
+          "text": "输出目录填 dist/pages；根目录保持默认",
+          "target": [
+            1918,
+            1610,
+            693,
+            123
+          ],
+          "from": [
+            3058,
+            1693
+          ]
+        },
+        {
+          "number": 4,
+          "text": "展开环境变量，添加 NODE_VERSION = 22",
+          "target": [
+            1918,
+            2033,
+            1700,
+            128
+          ],
+          "from": [
+            3345,
+            1965
+          ]
+        },
+        {
+          "number": 5,
+          "text": "检查无误，点击保存并部署",
+          "target": [
+            3503,
+            2443,
+            220,
+            98
+          ],
+          "from": [
+            3160,
+            2490
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-03.png",
+      "name": "git-03",
+      "title": "构建刚开始，先等待",
+      "caption": "初始化环境、克隆仓库、构建程序、发布到 Cloudflare 会依次进行。此时日志为空不代表失败。",
+      "width": 1863,
+      "height": 1075,
+      "bytes": 76355,
+      "sha256": "98d9fc18741f18327bf3971cbfeba2ce05367158fede8b7108d05576652e0e6b",
+      "sourceFile": "codex-clipboard-f974597b-d97b-4784-b42c-2209afc11705.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "a51baa9c3b038f369eb83cc2c053654e7df574a689d365902a3fcb3c37dcdb8f",
+      "crop": [
+        1888,
+        610,
+        1863,
+        800
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "转圈表示正在初始化；后续步骤尚未开始",
+          "target": [
+            1943,
+            648,
+            1768,
+            310
+          ],
+          "from": [
+            2875,
+            1200
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-04.png",
+      "name": "git-04",
+      "title": "读懂 Wrangler 配置提示",
+      "caption": "这条日志说明当前 wrangler.toml 未作为 Pages 配置使用，随后继续构建。按本教程在控制台设置，不要仅因这条提示就改配置文件。",
+      "width": 1863,
+      "height": 1267,
+      "bytes": 191300,
+      "sha256": "cb348b1948b083886304b45381f6fba98ae62cde256a12f1f5fd92d32d85fa02",
+      "sourceFile": "codex-clipboard-f081f6cd-f028-47ad-bb48-91afbeb5aa33.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "b5c00f959c37ad377b7f2f44008c49614b8dd4b4207d74e033b27369e68dd150",
+      "crop": [
+        1888,
+        645,
+        1863,
+        913
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "前两步已完成，程序仍在构建",
+          "target": [
+            1945,
+            653,
+            1768,
+            228
+          ],
+          "from": [
+            2875,
+            943
+          ]
+        },
+        {
+          "number": 2,
+          "text": "Skipping file and continuing 表示跳过配置并继续",
+          "target": [
+            1955,
+            1398,
+            1680,
+            118
+          ],
+          "from": [
+            3000,
+            1298
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-05.png",
+      "name": "git-05",
+      "title": "首次部署成功，再配置运行环境",
+      "caption": "成功提示确认首次部署已完成。中间的后续步骤面板已省略，保留成功提示和「继续处理项目」按钮。",
+      "width": 1865,
+      "height": 1068,
+      "bytes": 118811,
+      "sha256": "dd35fc26d1b3436225722f9d74b588e54c12bafac9e9d95b00ee8737b610f7ba",
+      "sourceFile": "codex-clipboard-b9edbcac-f4b3-496a-a543-d35287579c40.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "3b93afa9aab19c2afbbe9177f01094d8d4bfc597628b615fe30bbb8aa83a465d",
+      "crop": [
+        1888,
+        598,
+        1865,
+        1775
+      ],
+      "segments": [
+        [
+          1888,
+          598,
+          1865,
+          208
+        ],
+        [
+          1888,
+          1943,
+          1865,
+          430
+        ]
+      ],
+      "segmentGap": 76,
+      "segmentCaption": "⋯ 中间后续步骤面板已省略 ⋯",
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "这里是首次成功提示和项目默认访问地址",
+          "target": [
+            2448,
+            618,
+            743,
+            128
+          ],
+          "from": [
+            3403,
+            685
+          ]
+        },
+        {
+          "number": 2,
+          "text": "点击继续处理项目，进入项目设置",
+          "target": [
+            3490,
+            2273,
+            235,
+            88
+          ],
+          "from": [
+            3210,
+            2315
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-06.png",
+      "name": "git-06",
+      "title": "打开设置，找到变量与绑定",
+      "caption": "在项目设置中确认生产环境。构建配置已保存，NODE_VERSION 保留为 22，继续添加机密和 KV 绑定。",
+      "width": 1740,
+      "height": 2515,
+      "bytes": 262574,
+      "sha256": "fcd6529773a16e4674e6f7f4f31a99bc39c3da847566a25e490f3e29ff721364",
+      "sourceFile": "codex-clipboard-25e5f2dc-e7ec-487e-9b48-8bab0a6a439e.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "c87176cc1c80986d4d211d15d3644fbea778fbd75affb6883a24e9b4c4a9ddfa",
+      "crop": [
+        1728,
+        283,
+        1740,
+        2003
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "核对构建命令、输出目录和 main 分支",
+          "target": [
+            2078,
+            530,
+            683,
+            505
+          ],
+          "from": [
+            3033,
+            788
+          ]
+        },
+        {
+          "number": 2,
+          "text": "变量和密钥 → 添加：设置 ADMIN、UUID",
+          "target": [
+            3253,
+            1575,
+            183,
+            93
+          ],
+          "from": [
+            2953,
+            1618
+          ]
+        },
+        {
+          "number": 3,
+          "text": "NODE_VERSION = 22 保留为普通文本",
+          "target": [
+            2000,
+            1815,
+            1298,
+            98
+          ],
+          "from": [
+            2568,
+            1730
+          ]
+        },
+        {
+          "number": 4,
+          "text": "绑定 → 添加：稍后连接 KV 命名空间",
+          "target": [
+            3280,
+            2015,
+            135,
+            73
+          ],
+          "from": [
+            2980,
+            2050
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-07.png",
+      "name": "git-07",
+      "title": "添加 ADMIN 管理密码",
+      "caption": "实录中使用「文本」，实际保存密码建议改为「机密 / Secret」。变量名必须为 ADMIN，原密码已彻底遮盖。",
+      "width": 1045,
+      "height": 1611,
+      "bytes": 134071,
+      "sha256": "4f559a24029f4835c99f77923e7031a750baf7c85660b6713bd7e9b2eb7173d4",
+      "sourceFile": "codex-clipboard-20fe7ac1-b498-46a7-ad87-2bc8814eec03.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "0b5b71a18a41cd3a54850156cb8e042c6cb3b7fc7d1cce2f2f30bcb13dbf59b3",
+      "crop": [
+        2038,
+        125,
+        1045,
+        1240
+      ],
+      "redactions": [
+        {
+          "rect": [
+            2123,
+            848,
+            875,
+            148
+          ],
+          "reason": "管理员密码",
+          "replacement": "填写自己的强密码",
+          "method": "opaque baked-in cover"
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "截图选了文本；密码建议改为机密 / Secret",
+          "target": [
+            2118,
+            465,
+            885,
+            83
+          ],
+          "from": [
+            2738,
+            350
+          ]
+        },
+        {
+          "number": 2,
+          "text": "变量名为大写 ADMIN",
+          "target": [
+            2118,
+            628,
+            885,
+            83
+          ],
+          "from": [
+            2900,
+            783
+          ]
+        },
+        {
+          "number": 3,
+          "text": "填写自己的强密码后保存；下次部署生效",
+          "target": [
+            2325,
+            1273,
+            130,
+            78
+          ],
+          "from": [
+            2725,
+            1300
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-08.png",
+      "name": "git-08",
+      "title": "添加自己的 UUID",
+      "caption": "变量名为 UUID，填入自己生成并固定保存的 UUID v4。原值已遮盖；按页面提示保存，之后重新部署。",
+      "width": 1045,
+      "height": 1671,
+      "bytes": 132980,
+      "sha256": "d4ccad8a48b3aaa48bd191ec04853abdeed4be06d1b58faff9a1c3bdd003f5bd",
+      "sourceFile": "codex-clipboard-1d9761e3-12d2-471f-89af-81ff58ce748c.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "443ac2f3d3d38b018babaa72a512a3fc0c74a103c82480e2a7038b7489ba1118",
+      "crop": [
+        2038,
+        125,
+        1045,
+        1300
+      ],
+      "redactions": [
+        {
+          "rect": [
+            2123,
+            848,
+            875,
+            148
+          ],
+          "reason": "节点身份 UUID",
+          "replacement": "填写自己生成的 UUID",
+          "method": "opaque baked-in cover"
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "UUID 同样建议使用机密 / Secret",
+          "target": [
+            2118,
+            465,
+            885,
+            83
+          ],
+          "from": [
+            2738,
+            350
+          ]
+        },
+        {
+          "number": 2,
+          "text": "名称 UUID；值使用下方生成器生成",
+          "target": [
+            2118,
+            630,
+            885,
+            373
+          ],
+          "from": [
+            3025,
+            1105
+          ]
+        },
+        {
+          "number": 3,
+          "text": "保存前确认无校验错误；之后重新部署",
+          "target": [
+            2325,
+            1328,
+            130,
+            80
+          ],
+          "from": [
+            2725,
+            1363
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-09.png",
+      "name": "git-09",
+      "title": "选择 KV 资源类型",
+      "caption": "点击「绑定 → 添加」后，在右侧资源列表选择「KV 命名空间」。这里只截取所需区域，背景凭据不进入成图。",
+      "width": 802,
+      "height": 1030,
+      "bytes": 76638,
+      "sha256": "106183eb4160996507a29014a903897881895775766687e39f4951f97d54a653",
+      "sourceFile": "codex-clipboard-820f2638-2120-44b5-88e0-fa42b27eacb1.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "53e1709531cfe0e5c8be4d4ed2af5ccb0ecff7f1a2d1838031a0eebe513b2cf3",
+      "crop": [
+        4318,
+        1290,
+        802,
+        793
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "选择 KV 命名空间",
+          "target": [
+            4355,
+            1690,
+            735,
+            170
+          ],
+          "from": [
+            4750,
+            1635
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-10.png",
+      "name": "git-10",
+      "title": "填写 KV 绑定并保存",
+      "caption": "变量名称必须是大写 KV，命名空间选择自己的配置空间。上下两段保留原像素，中间仅省略空白。",
+      "width": 802,
+      "height": 1331,
+      "bytes": 116645,
+      "sha256": "5b6f2f95a6391e3b34d87bcd6d70ce4c05010699fee0687622b123f3be1e88fa",
+      "sourceFile": "codex-clipboard-fe2c252b-5f11-45fb-9f5c-badd77ab1ce9.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "bf0794ff8629354e857d055e6d5016a630805bb1afd55d74fe0ddae3a4403543",
+      "crop": [
+        4318,
+        0,
+        802,
+        2704
+      ],
+      "segments": [
+        [
+          4318,
+          0,
+          802,
+          643
+        ],
+        [
+          4318,
+          2463,
+          802,
+          241
+        ]
+      ],
+      "segmentGap": 76,
+      "segmentCaption": "⋯ 中间空白已省略 ⋯",
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "变量名称必须是大写 KV",
+          "target": [
+            4350,
+            353,
+            740,
+            83
+          ],
+          "from": [
+            4983,
+            273
+          ]
+        },
+        {
+          "number": 2,
+          "text": "选择刚创建的命名空间；图中名称为示例",
+          "target": [
+            4350,
+            515,
+            740,
+            83
+          ],
+          "from": [
+            4925,
+            473
+          ]
+        },
+        {
+          "number": 3,
+          "text": "点击保存；这次更改会在下次部署生效",
+          "target": [
+            4963,
+            2600,
+            133,
+            78
+          ],
+          "from": [
+            4763,
+            2675
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-11.png",
+      "name": "git-11",
+      "title": "对生产提交重试部署",
+      "caption": "变量和 KV 保存后，回到部署列表，在 main 生产部署右侧展开省略号菜单，点击「重试部署」。",
+      "width": 2453,
+      "height": 1361,
+      "bytes": 184695,
+      "sha256": "db0593b1892e804ef283ee2176c711a575eea9c41b05b54fa5c47bdb9941a6c6",
+      "sourceFile": "codex-clipboard-9569d056-18f7-4c1e-bad6-4db581b37150.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "18f976f96f99b969c25dfdfcda29aee14bd92e1da7de00e5255f78025b2b91e1",
+      "crop": [
+        1595,
+        313,
+        2453,
+        928
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "选择 main 对应的生产部署，记下提交编号",
+          "target": [
+            1640,
+            968,
+            690,
+            93
+          ],
+          "from": [
+            2600,
+            1158
+          ]
+        },
+        {
+          "number": 2,
+          "text": "点击这一行最右侧的省略号",
+          "target": [
+            3925,
+            975,
+            65,
+            75
+          ],
+          "from": [
+            3795,
+            903
+          ]
+        },
+        {
+          "number": 3,
+          "text": "点击重试部署，重新加载已保存的配置",
+          "target": [
+            3710,
+            1073,
+            265,
+            60
+          ],
+          "from": [
+            3478,
+            1145
+          ]
+        }
+      ]
+    },
+    {
+      "file": "github/git-12.png",
+      "name": "git-12",
+      "title": "重试已启动，仍需等待成功",
+      "caption": "截图中的 active、转圈图标与 initialize 表示本次任务仍在执行。等待构建和发布成功后，再检查后台登录与配置保存。",
+      "width": 2443,
+      "height": 2193,
+      "bytes": 209862,
+      "sha256": "38422df3f3c617c5aec3049ded0f72f70a4279043cbb1e42f8c6c75fe7a0dd2b",
+      "sourceFile": "codex-clipboard-ff6f36a9-4340-4340-b144-9d1b58603814.png",
+      "sourceWidth": 5120,
+      "sourceHeight": 2704,
+      "sourceSha256": "7fa53404763654207fafdb9683e30bd88453a8b27cd3651bd296be5177d1e0b9",
+      "crop": [
+        1598,
+        163,
+        2443,
+        1760
+      ],
+      "redactions": [],
+      "annotations": [
+        {
+          "number": 1,
+          "text": "核对 main 与提交编号；重试可以是同一提交",
+          "target": [
+            2278,
+            598,
+            450,
+            83
+          ],
+          "from": [
+            2468,
+            783
+          ]
+        },
+        {
+          "number": 2,
+          "text": "active 与转圈表示仍在执行，尚未确认成功",
+          "target": [
+            2848,
+            598,
+            260,
+            68
+          ],
+          "from": [
+            3175,
+            783
+          ]
+        },
+        {
+          "number": 3,
+          "text": "等待 initialize → clone repo → build → deploy 完成",
+          "target": [
+            1675,
+            1208,
+            2293,
+            425
+          ],
+          "from": [
+            2815,
+            1718
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,16 @@
 # 独立 HTML 教程验证
 
+## 2026-09-18 · Git 部署实操配图补充
+
+[GitHub 部署与维护](github-deploy.html) 加入本次提供的全部 12 张操作截图，并保留原有两张 Pages 入口图，共 14 张。新增图从 5120×2704 源图按原像素裁剪，添加编号、箭头和中文说明；ADMIN 与 UUID 在 PNG 中不透明遮盖，含凭据的源图不进入仓库。素材尺寸、裁剪坐标与 SHA-256 见 [Git 配图清单](tutorial-assets/github-captures.json)。
+
+- **34 项浏览器检查通过**：Git 篇 30 项覆盖 1440、900、390、320 px 布局、展开内容、全部新图查看、100% 滚动、下载、手机目录及断网后打开单文件 HTML；另有两篇教程首尾图片键盘导航的 4 项复核。
+- 修复共享查看器在首尾按钮禁用后丢失焦点的问题，两篇 HTML 均重新生成。部署与使用手册正文及配图未改动。
+- 12 张新图的内嵌 PNG 哈希与素材一致；实际下载的 ADMIN 图与脱敏素材逐字节一致。逐张检查箭头、标签与脱敏范围，已修正两处框线压字。
+- `npm run build:tutorial`、`npm run check`、`git diff --check` 通过，现有字体子集覆盖 Git 篇全部标题。详细结果及本轮文件哈希见 [github-validation.json](tutorial-assets/github-validation.json)。
+
+末张截图仅显示重试任务仍在执行，教程明确要求等待最终成功后再验证后台。本轮只修改和验证本地教程，没有操作 Cloudflare 账号或执行部署。以下为旧版本的历史记录。
+
 ## 2026-09-17 · 图文增强与 GitHub 篇
 
 对象：[部署与使用教程](tutorial.html) 与 [GitHub 部署与维护](github-deploy.html)。本轮实际执行 **56 项浏览器检查，全部通过**；其中主检查 50 项，复制、手机弹窗与互跳补充检查 6 项。详细逐项记录与两篇最终文件的 SHA-256 见 [illustrated-validation.json](tutorial-assets/illustrated-validation.json)。以下历史记录不计入本轮结果。
