@@ -169,7 +169,7 @@ const schema = {
     { label: '优选来源', path: ['优选订阅生成', 'local'], type: 'select', booleanSelect: true, options: [['true', '本地地址库'], ['false', '远程订阅生成器']] },
     { label: '订阅更新间隔', path: ['优选订阅生成', 'SUBUpdateTime'], type: 'number', min: 1, max: 720, hint: '单位：小时。客户端可能采用自己的刷新策略。' },
     { label: '随机 IP', path: ['优选订阅生成', '本地IP库', '随机IP'], type: 'boolean', hint: '开启：随机 IP；关闭：下方自定义地址列表。' },
-    { label: '随机 IP 数量', path: ['优选订阅生成', '本地IP库', '随机数量'], type: 'number', min: 1, max: 100 },
+    { label: '随机节点数量', path: ['优选订阅生成', '本地IP库', '随机数量'], type: 'number', min: 1, max: 1000, quickValues: [64, 128, 256, 512, 1000], hint: '支持 1–1000 个，首次默认 64 个。保存后更新客户端订阅生效；候选越多，批量测速耗时越长。地址池不足时仅返回可用的不同 IP。' },
     { label: '指定端口', path: ['优选订阅生成', '本地IP库', '指定端口'], type: 'number', min: -1, max: 65535, hint: '-1 表示自动选择端口。' },
     { label: '远程订阅生成器', path: ['优选订阅生成', 'SUB'], nullable: true, placeholder: '你的订阅生成器地址', hint: '选择远程来源时生效。' },
   ],
@@ -254,6 +254,20 @@ function createField(spec, { value, onChange, separate = false } = {}) {
     if (spec.presets) {
       const options = el('datalist'); options.id = id + '-presets'; input.setAttribute('list', options.id);
       spec.presets.forEach((value) => { const option = el('option'); option.value = value; options.append(option); }); wrapper.append(options);
+    }
+    if (spec.quickValues) {
+      const choices = el('div', 'field-choices');
+      spec.quickValues.forEach(value => {
+        const button = el('button', 'button button-small', value + ' 个'); button.type = 'button';
+        button.dataset.fieldValue = String(value);
+        button.setAttribute('aria-label', spec.label + '设为 ' + value + ' 个');
+        button.addEventListener('click', () => {
+          if (input.disabled) return;
+          input.value = String(value); input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        choices.append(button);
+      });
+      wrapper.append(choices);
     }
     if (spec.action === 'copy') {
       const action = el('button', 'button button-small field-inline-action', '复制 ' + spec.tag); action.type = 'button';
@@ -354,7 +368,14 @@ function syncConfigControls({ preserveInput = null } = {}) {
     if (key === '传输协议' && ss) reason = 'Shadowsocks 仅使用 WebSocket；选择其他节点协议后可更改。';
     if (key === '启用0RTT' && (ss || read(['传输协议']) === 'grpc')) reason = '当前节点协议 / 传输方式不支持 0-RTT。';
     if ((key === 'ECH' || key === 'TLS分片') && noTLS) reason = '请先开启 Shadowsocks TLS，才能使用此选项。';
+    if (key === '优选订阅生成.本地IP库.随机数量' && (!read(['优选订阅生成', 'local']) || !read(['优选订阅生成', '本地IP库', '随机IP']))) reason = '选择本地地址库并开启随机 IP 后，可调整随机节点数量。';
     input.disabled = state.busy || !!reason;
+    input.closest('.field').querySelectorAll('[data-field-value]').forEach(button => {
+      const selected = button.dataset.fieldValue === input.value;
+      button.disabled = input.disabled;
+      button.setAttribute('aria-pressed', String(selected));
+      button.classList.toggle('button-primary', selected);
+    });
     let hint = input.closest('.field').querySelector('.compatibility-hint');
     if (reason && !hint) { hint = el('p', 'field-hint compatibility-hint'); hint.id = input.id + '-compatibility'; input.closest('.field').append(hint); }
     if (hint) { hint.textContent = reason; hint.hidden = !reason; }

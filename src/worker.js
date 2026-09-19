@@ -1,12 +1,13 @@
 /*
- * Brclio Edge — modified 2026-09-18 by Brclio.
+ * Brclio Edge — modified 2026-09-19 by Brclio.
  * Based on cmliu/edgetunnel 448a83ced00a43c1d892d5ecbed86a26ea9eeaff.
  * GPL-2.0-only. Original tunnel implementation and contributor credits retained.
  * Changes: local UI, signed sessions, protected mutations, configuration validation,
  * request-scoped config, redacted logs, official Cloudflare TCP connector,
  * persisted proxy whitelist routing, consistent ALPN in node links,
  * conditional policy reads, request-scoped dial settings, real probe forwarding,
- * incremental tunnel/proxy handshakes, explicit routes, bounded DoH and TTL caching.
+ * incremental tunnel/proxy handshakes, explicit routes, bounded DoH and TTL caching,
+ * configurable unique random subscription candidates.
  * See LICENSE and THIRD_PARTY_NOTICES.md.
  */
 import { connect } from 'cloudflare:sockets';
@@ -14,6 +15,7 @@ import { decodeHunk } from './grpc.js';
 import { createTunnelHandshakeParser, isPossibleTunnelPrefix } from './tunnel-handshake.js';
 import { dialSettings, withTimeout } from './tunnel-runtime.js';
 import { prependSocketData } from './proxy-streams.js';
+import { DEFAULT_RANDOM_NODE_COUNT, normalizeRandomNodeCount, sampleUniqueIPv4 } from './node-pool.js';
 import { handleAdminTool } from './admin-tools.js';
 import { deploymentDownload } from './downloads.js';
 import { DEFAULT_PROXY_WHITELIST, defaultProxyWhitelist, loadProxyWhitelist, matchesProxyWhitelist } from './proxy-whitelist.js';
@@ -135,7 +137,7 @@ const worker = {
                             if (input.port) url.searchParams.set('port', String(input.port));
                         }
                     }
-                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.7', upstreamVersion: Version, kv: true });
+                    if (访问路径 === 'admin/meta') return json({ brand: 'Brclio Edge', version: '1.0.8', upstreamVersion: Version, kv: true });
                     if (request.method === 'POST' && ['admin/cf.json', 'admin/tg.json'].includes(访问路径)) return saveCredentials(request, env, 访问路径 === 'admin/cf.json' ? 'cf' : 'tg');
                     if (访问路径 === 'admin/init' && request.method !== 'POST') return json({ error: '重置配置需要 POST' }, 405, { Allow: 'POST' });
                     if (request.method === 'GET' && 区分大小写访问路径 === 'admin/ADD.txt') {
@@ -5379,7 +5381,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 			local: true, // true: 基于本地的优选地址  false: 优选订阅生成器
 			本地IP库: {
 				随机IP: true, // 当 随机IP 为true时生效，启用随机IP的数量，否则使用KV内的ADD.txt
-				随机数量: 16,
+				随机数量: DEFAULT_RANDOM_NODE_COUNT,
 				指定端口: -1,
 			},
 			SUB: null,
@@ -5465,6 +5467,7 @@ async function 读取config_JSON(env, hostname, userID, UA = "Mozilla/5.0", 重�
 		config_JSON = 默认配置JSON;
 	}
 
+	config_JSON.优选订阅生成.本地IP库.随机数量 = normalizeRandomNodeCount(config_JSON.优选订阅生成.本地IP库.随机数量);
 	if (!config_JSON.订阅转换配置.SUBLIST) config_JSON.订阅转换配置.SUBLIST = false;
     if (config_JSON.订阅转换配置.EXPAND === undefined) config_JSON.订阅转换配置.EXPAND = false;
 	if (!config_JSON.订阅转换配置.UDP) config_JSON.订阅转换配置.UDP = false;
@@ -5642,7 +5645,7 @@ function 识别订阅运营商(request, url = new URL(request.url)) {
 	return ['ct', 'cu', 'cmcc', 'cf'].includes(查询参数运营商) ? 查询参数运营商 : 识别运营商(request);
 }
 
-async function 生成随机IP(request, count = 16, 指定端口 = -1) {
+async function 生成随机IP(request, count = DEFAULT_RANDOM_NODE_COUNT, 指定端口 = -1) {
 	const 运营商文件标识 = 识别订阅运营商(request);
 	const 运营商名称映射 = {
 		cmcc: 'CF移动优选',
@@ -5657,23 +5660,13 @@ async function 生成随机IP(request, count = 16, 指定端口 = -1) {
 	try {
         const res = await fetch(cidr_url, { signal: AbortSignal.timeout(4000) });
         if (res.ok) {
-            cidrList = (await 整理成数组(await res.text())).map(value => value.trim()).filter(value => {
-                if (!/^(?:\d{1,3}\.){3}\d{1,3}\/(?:\d|[12]\d|3[0-2])$/.test(value)) return false;
-                return value.split('/')[0].split('.').every(octet => Number(octet) <= 255);
-            });
+            cidrList = await 整理成数组(await res.text());
         }
     } catch { /* Network errors and timeouts fall back to the known CIDR below. */ }
-    if (!cidrList.length) cidrList = ['104.16.0.0/13'];
+    let candidates = sampleUniqueIPv4(cidrList, count);
+    if (!candidates.length) candidates = sampleUniqueIPv4(['104.16.0.0/13'], count);
 
-	const generateRandomIPFromCIDR = (cidr) => {
-		const [baseIP, prefixLength] = cidr.split('/'), prefix = parseInt(prefixLength), hostBits = 32 - prefix;
-		const ipInt = baseIP.split('.').reduce((a, p, i) => a | (parseInt(p) << (24 - i * 8)), 0);
-		const randomOffset = Math.floor(Math.random() * Math.pow(2, hostBits));
-		const mask = prefix === 0 ? 0 : (0xFFFFFFFF << hostBits) >>> 0, randomIP = (((ipInt & mask) >>> 0) + randomOffset) >>> 0;
-		return [(randomIP >>> 24) & 0xFF, (randomIP >>> 16) & 0xFF, (randomIP >>> 8) & 0xFF, randomIP & 0xFF].join('.');
-	};
-	const randomIPs = Array.from({ length: count }, (_, index) => {
-		const ip = generateRandomIPFromCIDR(cidrList[Math.floor(Math.random() * cidrList.length)]);
+	const randomIPs = candidates.map((ip, index) => {
 		const 目标端口 = 指定端口 === -1
 			? cfport[Math.floor(Math.random() * cfport.length)]
 			: 指定端口;

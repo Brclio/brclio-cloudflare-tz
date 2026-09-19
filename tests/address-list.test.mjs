@@ -3,6 +3,7 @@ import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { DEFAULT_RANDOM_NODE_COUNT } from '../src/node-pool.js';
 
 const origin = 'https://addresses.example.com';
 const outgoing = [];
@@ -50,11 +51,12 @@ test('the address editor reads stored text only while subscriptions safely gener
   });
 
   const config = await (await request('/admin/config.json')).json();
-  const readCandidateHosts = async () => {
+  const readCandidateHosts = async (expectedCount = DEFAULT_RANDOM_NODE_COUNT) => {
     const response = await request(`/sub?token=${config.优选订阅生成.TOKEN}&b64`);
     assert.equal(response.status, 200);
     const links = Buffer.from(await response.text(), 'base64').toString('utf8').trim().split('\n');
-    assert.equal(links.length, 16);
+    assert.equal(links.length, expectedCount);
+    assert.equal(new Set(links.map(link => new URL(link).hostname)).size, expectedCount);
     return links.map(link => new URL(link).hostname);
   };
   await t.test('empty and invalid CIDR bodies use the fixed Cloudflare fallback', async () => {
@@ -69,7 +71,7 @@ test('the address editor reads stored text only while subscriptions safely gener
   });
   await t.test('valid CIDRs are retained while malformed rows are discarded', async () => {
     cidrText = 'bad-row\n198.51.100.7/32\n300.2.3.4/24';
-    assert.deepEqual(await readCandidateHosts(), Array(16).fill('198.51.100.7'));
+    assert.deepEqual(await readCandidateHosts(1), ['198.51.100.7']);
     assert.equal(await kv.get('ADD.txt'), null, 'Subscription candidates must not masquerade as a saved address list');
   });
 });

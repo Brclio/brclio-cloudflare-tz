@@ -1,5 +1,6 @@
 // Copyright (C) 2026 Brclio. GPL-2.0-only.
 import assets from 'brclio:assets';
+import { MAX_RANDOM_NODE_COUNT } from './node-pool.js';
 
 const encoder = new TextEncoder();
 const SESSION_SECONDS = 86400;
@@ -111,7 +112,7 @@ export function validateConfig(config) {
   // Keep that supported host syntax, including hosts supplied by env.HOST.
   if (!Array.isArray(config.HOSTS) || !config.HOSTS.length || config.HOSTS.some(h => typeof h !== 'string' || !/^[a-z0-9*.-]+$/i.test(h))) return 'HOSTS 必须为有效域名数组（可含 *，不含协议、端口）';
   const pool = config.优选订阅生成.本地IP库;
-  if (!Number.isInteger(pool.随机数量) || pool.随机数量 < 1 || pool.随机数量 > 100) return '随机节点数量必须为 1–100 的整数';
+  if (!Number.isInteger(pool.随机数量) || pool.随机数量 < 1 || pool.随机数量 > MAX_RANDOM_NODE_COUNT) return `随机节点数量必须为 1–${MAX_RANDOM_NODE_COUNT} 的整数`;
   if (pool.指定端口 !== -1 && (!Number.isInteger(pool.指定端口) || pool.指定端口 < 1 || pool.指定端口 > 65535)) return '端口必须为 1–65535 的整数，或 -1 表示随机';
   if (!Number.isFinite(config.优选订阅生成.SUBUpdateTime) || config.优选订阅生成.SUBUpdateTime <= 0) return '订阅更新间隔必须为大于 0 的数值';
   if (typeof config.反代.PROXYIP !== 'string' || !Array.isArray(config.反代.SOCKS5.白名单)) return 'ProxyIP 必须是文字，代理白名单必须是数组';
