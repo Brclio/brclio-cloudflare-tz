@@ -436,14 +436,19 @@ function withTimeout(promise, label, ms = 5000) {
 
 async function openHttpTunnel(transport, initial, endUpload = false) {
   let upload;
-  const body = new ReadableStream({ start(controller) { upload = controller; } });
+  // Rejection fixtures are finite requests: submit a known-length body so an
+  // immediate 400 cannot race an unnecessary chunked upload through Miniflare's
+  // Undici bridge. Successful tunnel fixtures retain their streaming upload.
+  let body = initial;
+  if (!endUpload) {
+    body = new ReadableStream({ start(controller) { upload = controller; } });
+    // Deliberately split a gRPC envelope / protocol header across HTTP chunks.
+    upload.enqueue(initial.subarray(0, 2));
+    upload.enqueue(initial.subarray(2, 13));
+    upload.enqueue(initial.subarray(13));
+  }
   const isGrpc = transport.startsWith('grpc');
   const path = transport === 'grpc-multi' ? '/local-test/TunMulti' : isGrpc ? '/local-test/Tun' : '/local-test';
-  // Deliberately split a gRPC envelope / protocol header across HTTP chunks.
-  upload.enqueue(initial.subarray(0, 2));
-  upload.enqueue(initial.subarray(2, 13));
-  upload.enqueue(initial.subarray(13));
-  if (endUpload) upload.close();
   const response = await withTimeout(mf.dispatchFetch(`https://tunnel.example.com${path}`, {
     method: 'POST',
     headers: { 'Content-Type': isGrpc ? 'application/grpc' : 'application/octet-stream', 'User-Agent': 'Brclio-Protocol-QA' },
@@ -456,7 +461,6 @@ async function openHttpTunnel(transport, initial, endUpload = false) {
   return {
     response,
     send(bytes) { upload.enqueue(bytes); },
-    endUpload() { try { upload.close(); } catch {} },
     async readBytes(length) {
       return withTimeout((async () => {
         while (pending.length < length) {
@@ -480,7 +484,7 @@ async function openHttpTunnel(transport, initial, endUpload = false) {
       })(), `${transport} rejection did not finish`);
     },
     async close() {
-      try { upload.close(); } catch {}
+      try { upload?.close(); } catch {}
       await reader.cancel().catch(() => {});
     },
   };
@@ -517,11 +521,10 @@ for (const [protocol, handshake] of [['VLESS', vlessHandshake], ['Trojan', troja
       const connectionsBefore = acceptedConnections;
       const invalid = handshake(wrongUuid, Buffer.from('must-not-reach-tcp'));
       const initial = transport.startsWith('grpc') ? grpcFrame([invalid]) : invalid;
-      // A short invalid VLESS header may still be a partial Trojan header;
-      // close the request to establish EOF rather than waiting on each other.
+      // Send the complete invalid request as a finite body; authentication
+      // rejection must still return the expected status/body without any TCP.
       const tunnel = await openHttpTunnel(transport, initial, true);
       try {
-        tunnel.endUpload();
         const response = await tunnel.readToEnd();
         if (transport === 'xhttp') {
           assert.equal(tunnel.response.status, 400);

@@ -6,8 +6,9 @@
 
 新安装默认 64 个，设置范围 1–1000；升级保留合法旧值。生成器先合并重复及重叠 IPv4 网段，再不重复抽样；小地址池返回全部不同 IP，不靠重复编号凑数。操作入口及更新顺序见 [README](../README.md#增加订阅节点数量)。
 
-- 构建后执行完整 `node --test tests/*.test.mjs`：**349 / 349 通过，0 失败、0 跳过**；`npm run check`、`git diff --check` 通过，Node v26.5.0。
+- 构建后执行完整 `node --test tests/*.test.mjs`：**349 / 349 通过，0 失败、0 跳过**；`npm run check`、`git diff --check` 通过。本地 Node v26.5.0 及与 CI 一致的 v22.23.2 均完成全量复核。
 - 新增 6 项采样单元测试和 12 项真实 Worker 集成测试：默认 64、128/1000 唯一 IP、旧 16/37 保留、非法旧值归一且不写回 KV、保存校验、重叠网段、小池、`/0`、固定 ADD 列表，以及本地转换器真实回源后返回完整 1000 个 Clash 节点。网络均为本地 fixture，未调用公共转换服务；生成 1000 个候选仍只读取一次 CIDR 源，不逐节点探测。
+- 首次 CI 的旧 Trojan XHTTP 错误凭据用例在 Miniflare `dispatchFetch` 阶段报 `fetch failed`，本地 Node 22 未复现。有限拒绝用例现用固定长度请求体，移除不必要的流式上传时序竞争；仍严格断言 400、`Invalid request` 和零 TCP 连接，正向分片及持续上传用例保持原样。
 - Playwright 真实浏览器验证预设选择、128/1000 保存并刷新持久化、实际下载 1000 个不同 IP、0/1001/小数拦截、随机与远程模式联动、选中状态无障碍属性。1440px / 390px 无横向溢出，日间 / 夜间修改区域截图检查通过，无页面运行错误。
 - `wrangler deploy --dry-run` 通过，gzip 684.50 KiB；独立 Worker、Pages 目录和 ZIP 内 Worker 字节一致，ZIP 含 8 个根文件，构建清单与管理接口版本为 1.0.8。
 
