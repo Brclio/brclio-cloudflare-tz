@@ -1,11 +1,13 @@
 // Copyright (C) 2026 Brclio. GPL-2.0-only.
 import assets from 'brclio:assets';
 import { MAX_RANDOM_NODE_COUNT } from './node-pool.js';
+import { VERSION } from './version.js';
 
 const encoder = new TextEncoder();
 const SESSION_SECONDS = 86400;
 const attempts = new Map(); // Best-effort per-isolate throttle; not a global rate limiter.
 export const panelHeaders = {
+  'X-Brclio-Version': VERSION,
   'Cache-Control': 'no-store',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',

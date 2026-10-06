@@ -344,6 +344,31 @@ function receiveDecodedWebSocket(ws, decode, expectedLength, send) {
 }
 
 for (const method of ['aes-128-gcm', 'aes-256-gcm']) {
+  test(`Shadowsocks ${method} buffers its address across independently authenticated AEAD records`, { timeout: 15000 }, async () => {
+    const connectionsBefore = acceptedConnections;
+    const ws = await openWebSocket(`/?enc=${method}`);
+    const encode = ssEncoder(method, uuid);
+    const decode = ssDecoder(method, uuid);
+    try {
+      const hostname = Buffer.from('fixture.example.com');
+      const address = Buffer.concat([Buffer.from([3, hostname.length]), hostname, Buffer.from([1, 187])]);
+      const greeting = Buffer.from(`SS ${method} split address`);
+      // Each byte is in a distinct, valid AEAD payload record. Transport-only
+      // fragmentation of one complete address does not exercise this boundary.
+      const records = Array.from(address, byte => encode(Buffer.from([byte])));
+      records.push(encode(greeting));
+      const first = await receiveDecodedWebSocket(ws, decode, greeting.length, () => {
+        for (const record of records) ws.send(record);
+      });
+      assertSameBytes(first, greeting, `${method} address fragments`);
+      assert.equal(acceptedConnections, connectionsBefore + 1, 'Only a complete authenticated address may dial');
+      const next = Buffer.from('continuation after the address');
+      assertSameBytes(await receiveDecodedWebSocket(ws, decode, next.length, () => ws.send(encode(next))), next, `${method} continuation`);
+    } finally {
+      try { ws.close(); } catch {}
+    }
+  });
+
   test(`Shadowsocks ${method} WebSocket decrypts/encrypts first and continuation data through local TCP`, { timeout: 15000 }, async () => {
     const connectionsBefore = acceptedConnections;
     const ws = await openWebSocket(`/?enc=${method}`);

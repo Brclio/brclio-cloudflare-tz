@@ -1,5 +1,7 @@
 # Worker 与原版的差异
 
+> 历史记录：下文为 v1.0.7 的审计快照。v1.0.9 已修复其中的 DNS UDP、gRPC EOF、SS 分片地址、代理协商期限及 HTTPS-IP TLS/背压问题，并调整建连默认期限；当前行为、验证与剩余限制见 [v1.0.9 稳定性说明](stability-v1.0.9.md)。
+
 核对日期：2026-09-18；本地源码版本：v1.0.7；上游基线：[cmliu/edgetunnel `448a83c`](https://github.com/cmliu/edgetunnel/blob/448a83ced00a43c1d892d5ecbed86a26ea9eeaff/_worker.js)。核对时上游 main 仍指向此提交。
 
 **当前程序沿用原版大部分隧道实现，但不是原版文件完全照搬。** 改动包含实际路由、gRPC 解码、TCP 连接、配置与安全逻辑。不能将它描述为仅更换界面，或保证与原版逐行为等价。

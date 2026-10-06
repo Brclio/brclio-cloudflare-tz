@@ -1,6 +1,6 @@
 {
   "name": "brclio-cloudflare-tz",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "type": "module",
   "description": "Brclio Edge — an open source Cloudflare tunnel console based on cmliu/edgetunnel",
@@ -23,6 +23,7 @@
     "fflate": "0.8.3",
     "miniflare": "5.20260911.1-alpha",
     "qrcode-generator": "2.0.4",
-    "wrangler": "4.131.2"
+    "wrangler": "4.131.2",
+    "ws": "8.21.0"
   }
 }

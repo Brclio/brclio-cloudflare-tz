@@ -20,7 +20,7 @@ before(async () => {
   mf = new Miniflare(convertV4MiniflareOptions({
     modules: true, scriptPath: fileURLToPath(new URL('../dist/_worker.js', import.meta.url)),
     compatibilityDate: '2025-11-04', cf: { colo: 'TEST', asn: 0, country: 'XX' },
-    bindings: { ADMIN: 'local-handshake-password', UUID: uuid, OFF_LOG: 'true', TCP_CONCURRENT_DIAL: '1' },
+    bindings: { ADMIN: 'local-handshake-password', UUID: uuid, OFF_LOG: 'true', TCP_CONCURRENT_DIAL: '1', PROXY_HANDSHAKE_TIMEOUT_MS: '1000' },
     outboundService: request => { outbound.push(request.url); return new Response('External fetch blocked', { status: 599 }); },
   }));
   await mf.ready;
@@ -79,8 +79,9 @@ async function fixture(kind, options = {}) {
     };
     const sendPieces = async pieces => {
       for (let i = 0; i < pieces.length; i++) {
+        if (socket.destroyed) return;
         socket.write(pieces[i]);
-        if (i + 1 < pieces.length) await pause(20);
+        if (i + 1 < pieces.length) await pause(options.pieceDelay || 20);
       }
     };
     const run = async () => {
@@ -88,6 +89,7 @@ async function fixture(kind, options = {}) {
         if (kind === 'socks5') {
           const greeting = await take(2); assert.equal(greeting[0], 5);
           const methods = await take(greeting[1]);
+          if (options.silent) { await reader.read(); return; }
           const method = options.auth ? 2 : 0; assert.ok(methods.includes(method));
           const selection = Buffer.from([options.invalid === 'method-version' ? 4 : 5, method]);
           await sendPieces(options.split ? [selection.subarray(0, 1), selection.subarray(1)] : [selection]);
@@ -123,7 +125,9 @@ async function fixture(kind, options = {}) {
           records.targets.push(`${target}:443`);
           const response = Buffer.from('HTTP/1.1 200 Connection Established\r\n\r\n');
           stage = 'sending-connect';
-          await sendPieces(options.split ? [response.subarray(0, 12), Buffer.concat([response.subarray(12), banner])]
+          if (options.silent) { await reader.read(); return; }
+          await sendPieces(options.drip ? [...response].map(byte => Buffer.from([byte]))
+            : options.split ? [response.subarray(0, 12), Buffer.concat([response.subarray(12), banner])]
             : [Buffer.concat([response, banner])]);
         }
         stage = 'application';
@@ -134,7 +138,7 @@ async function fixture(kind, options = {}) {
           pending = Buffer.from(value);
         }
       } catch (error) {
-        if (!options.invalid && !socket.destroyed) records.errors.push(error);
+        if (!options.invalid && !options.expectTimeout && !socket.destroyed) records.errors.push(error);
       } finally {
         try { reader.releaseLock(); } catch {}
       }
@@ -196,6 +200,30 @@ for (const invalid of ['method-version', 'auth-version', 'reply-version', 'reser
       assert.equal(received, 0);
       assert.deepEqual(f.records.received, []);
       assert.equal(f.records.premature, false);
+      await f.finish();
+    } finally { await f.cleanup(); }
+  });
+}
+
+for (const [label, kind, options] of [
+  ['silent SOCKS5 method selection', 'socks5', { silent: true }],
+  ['silent HTTP CONNECT response', 'http', { silent: true }],
+  ['continuously arriving HTTP CONNECT header fragments', 'http', { drip: true, pieceDelay: 120 }],
+]) {
+  test(`${label} expires within the configured total handshake deadline`, { timeout: 10000 }, async () => {
+    const f = await fixture(kind, { ...options, expectTimeout: true });
+    let messages = 0;
+    const start = Date.now();
+    try {
+      await deadline(new Promise(resolve => {
+        f.ws.addEventListener('message', () => { messages++; });
+        f.ws.addEventListener('close', resolve, { once: true });
+        f.ws.send(frame(Buffer.from('must not precede CONNECT success')));
+      }), 'Proxy handshake did not observe its one-second deadline', 3000);
+      assert.ok(Date.now() - start < 2500, 'Fragment arrivals must not restart the total deadline');
+      assert.equal(messages, 0);
+      assert.deepEqual(f.records.received, []);
+      assert.equal(f.records.accepted, 1);
       await f.finish();
     } finally { await f.cleanup(); }
   });

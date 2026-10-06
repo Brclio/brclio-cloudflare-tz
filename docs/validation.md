@@ -1,6 +1,20 @@
 # 验证与发布记录
 
-首次本地核验：2026-09-15；发布复核：2026-09-16。这里记录实际执行过的检查，便于维护者复现；不代表已在 Cloudflare 生产环境部署。
+首次本地核验：2026-09-15。这里按版本记录实际检查；历史未部署说明仅适用于对应版本。v1.0.9 发布、精确提交 CI 与线上结果见 [Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/tag/v1.0.9)。
+
+
+## 2026-10-07 长连接稳定性修复（v1.0.9）
+
+修改前为 v1.0.8 / `196ff6c`，另对照本地原版 `af4f983`；故障、配置与剩余限制见 [稳定性说明](stability-v1.0.9.md)。
+
+- `npm test` **421 / 421 通过，0 失败、0 跳过**，本地 Node 26.5.0；CI 另用 Node 22。此前 349 项基线通过并未覆盖这些生命周期问题，本轮补齐 72 项。
+- workerd 使用真实回环 TCP：WS 与 XHTTP 各传输 16 MiB 加 64 KiB 尾部，慢读、静默 31 秒后续传，逐字节长度与 SHA-256 一致，无额外重拨；XHTTP 上传 FIN 后完整收到迟到响应。gRPC 另验证 16 MiB 暂停恢复及背压阻塞时取消。
+- 针对旧代码运行失败对照，复现 gRPC EOF 截断/取消和背压、SS 地址跨记录、DNS 等待 EOF、健康 1200 ms 拨号被替换、取消后迟到 DNS 仍拨号、部分写入重放及 Trojan 协商无期限；新增用例在修复后通过。
+- XHTTP 活跃下行取消用例实际发现上传 producer 未取消，已加显式响应 cancel 清理后复测通过；不是只检查目标 socket 已关闭。生产兼容日期 `2026-09-01` 的真实 WS 客户端关闭通过。
+- `npm run check`、`git diff --check`、教程构建、`wrangler deploy --dry-run` 通过；dry-run gzip **694.52 KiB**，不上传或替换 KV。关闭 socket 返回 Promise 的 rejection 处理补齐后，相关 TCP/XHTTP/DNS/gRPC 生命周期 **45 / 45** 定向复测通过。
+- 发布前通过已有 WS/TLS 节点的隔离 Mihomo 核验：目标 TLS 1.3，HTTPS HTTP 200 / 65536 字节及独立 SHA-256 正确；同一 TLS socket 静默 31 秒后再次请求成功。该基线本身已通过，不能由此声称修复提升了公网速度。
+- 发布后使用相同节点进行 16 MiB 暂停恢复校验，并确认两个部署域名的 `X-Brclio-Version` 与 GitHub Cloudflare Pages check。实际发布结果记录在 Release，避免把计划当作已部署证据。
+- 未更改用户运行中的 Clash 配置、系统代理或当前节点；独立客户端无 TUN/controller，凭据仅存临时 0600 配置，结束清理。没有线上现存 gRPC 节点，gRPC 公网端到端与真实 Codex 会话未宣称已验收。
 
 ## 2026-09-19 随机订阅节点扩容（v1.0.8）
 

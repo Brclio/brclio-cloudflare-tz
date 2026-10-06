@@ -1,22 +1,26 @@
 // Copyright (C) 2026 Brclio. GPL-2.0-only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dialSettings, withTimeout } from '../src/tunnel-runtime.js';
+import { dialSettings, withTimeout, canReplayInitialData } from '../src/tunnel-runtime.js';
+
+function assertSettings(actual, expected, message) {
+  assert.deepEqual(actual, { connectTimeoutMs: 3000, proxyHandshakeTimeoutMs: 10000, ...expected }, message);
+}
 
 test('dial settings preserve carrier defaults without inheriting earlier requests', () => {
-  assert.deepEqual(dialSettings(), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false });
-  assert.deepEqual(dialSettings({}, 'cmcc'), { tcpConcurrency: 1, proxyConcurrency: 1, preloadRace: false });
+  assertSettings(dialSettings(), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false });
+  assertSettings(dialSettings({}, 'cmcc'), { tcpConcurrency: 1, proxyConcurrency: 1, preloadRace: false });
   for (const carrier of ['ct', 'cu', 'cf', 'unknown']) {
-    assert.deepEqual(dialSettings({}, carrier), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false });
+    assertSettings(dialSettings({}, carrier), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false });
   }
 });
 
 test('explicit dial settings override carrier defaults and bound pending connections', () => {
-  assert.deepEqual(dialSettings({ TCP_CONCURRENT_DIAL: '4', PROXY_CONCURRENT_DIAL: '3', PRELOAD_RACE_DIAL: 'true' }, 'cmcc'),
+  assertSettings(dialSettings({ TCP_CONCURRENT_DIAL: '4', PROXY_CONCURRENT_DIAL: '3', PRELOAD_RACE_DIAL: 'true' }, 'cmcc'),
     { tcpConcurrency: 4, proxyConcurrency: 3, preloadRace: true });
-  assert.deepEqual(dialSettings({ TCP_CONCURRENT_DIAL: '2.9', PROXY_CONCURRENT_DIAL: '0.5', PRELOAD_RACE_DIAL: '1' }),
+  assertSettings(dialSettings({ TCP_CONCURRENT_DIAL: '2.9', PROXY_CONCURRENT_DIAL: '0.5', PRELOAD_RACE_DIAL: '1' }),
     { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: true });
-  assert.deepEqual(dialSettings({ TCP_CONCURRENT_DIAL: '999999999', PROXY_CONCURRENT_DIAL: '1e100' }),
+  assertSettings(dialSettings({ TCP_CONCURRENT_DIAL: '999999999', PROXY_CONCURRENT_DIAL: '1e100' }),
     { tcpConcurrency: 6, proxyConcurrency: 6, preloadRace: false });
   for (const value of [undefined, '', '0', 'false', 'TRUE', true]) {
     assert.equal(dialSettings({ PRELOAD_RACE_DIAL: value }).preloadRace, false, `Preload flag ${String(value)} must not opt in`);
@@ -26,8 +30,8 @@ test('explicit dial settings override carrier defaults and bound pending connect
 test('invalid concurrency inputs fall back without creating invalid candidate counts', () => {
   for (const value of [undefined, null, '', ' ', '0', '-1', 'not-a-number', 'Infinity', '-Infinity', '1e309', NaN, Infinity, -Infinity]) {
     const env = { TCP_CONCURRENT_DIAL: value, PROXY_CONCURRENT_DIAL: value };
-    assert.deepEqual(dialSettings(env), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false }, `Default carrier with ${String(value)}`);
-    assert.deepEqual(dialSettings(env, 'cmcc'), { tcpConcurrency: 1, proxyConcurrency: 1, preloadRace: false }, `Mobile carrier with ${String(value)}`);
+    assertSettings(dialSettings(env), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false }, `Default carrier with ${String(value)}`);
+    assertSettings(dialSettings(env, 'cmcc'), { tcpConcurrency: 1, proxyConcurrency: 1, preloadRace: false }, `Mobile carrier with ${String(value)}`);
   }
 });
 
@@ -38,13 +42,13 @@ test('overlapping requests retain immutable independent snapshots when environme
   env.PROXY_CONCURRENT_DIAL = '4';
   env.PRELOAD_RACE_DIAL = 'false';
   const later = dialSettings(env, 'ct');
-  assert.deepEqual(earlier, { tcpConcurrency: 5, proxyConcurrency: 2, preloadRace: true });
-  assert.deepEqual(later, { tcpConcurrency: 2, proxyConcurrency: 4, preloadRace: false });
+  assertSettings(earlier, { tcpConcurrency: 5, proxyConcurrency: 2, preloadRace: true });
+  assertSettings(later, { tcpConcurrency: 2, proxyConcurrency: 4, preloadRace: false });
   assert.notEqual(earlier, later);
   assert.ok(Object.isFrozen(earlier));
   assert.throws(() => { earlier.tcpConcurrency = 6; }, TypeError);
-  assert.deepEqual(dialSettings({}, 'cmcc'), { tcpConcurrency: 1, proxyConcurrency: 1, preloadRace: false });
-  assert.deepEqual(dialSettings({}, 'ct'), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false });
+  assertSettings(dialSettings({}, 'cmcc'), { tcpConcurrency: 1, proxyConcurrency: 1, preloadRace: false });
+  assertSettings(dialSettings({}, 'ct'), { tcpConcurrency: 2, proxyConcurrency: 1, preloadRace: false });
 });
 
 function trackedTimers(t) {
@@ -120,4 +124,32 @@ test('finishing one connection does not cancel another connection deadline', asy
   assert.equal(timers.fired, 1);
   assert.equal(timers.clear.mock.callCount(), 2);
   assert.deepEqual(timers.clear.mock.calls.map(call => call.arguments[0]), timers.handles);
+});
+
+
+test('connection and proxy negotiation deadlines are bounded and request scoped', () => {
+  assert.equal(dialSettings({ CONNECT_TIMEOUT_MS: '12000' }).connectTimeoutMs, 12000);
+  assert.equal(dialSettings({ CONNECT_TIMEOUT_MS: '1' }).connectTimeoutMs, 250);
+  assert.equal(dialSettings({ CONNECT_TIMEOUT_MS: '90000' }).connectTimeoutMs, 15000);
+  assert.equal(dialSettings({ PROXY_HANDSHAKE_TIMEOUT_MS: '90000' }).proxyHandshakeTimeoutMs, 60000);
+  assert.equal(dialSettings({ PROXY_HANDSHAKE_TIMEOUT_MS: '1' }).proxyHandshakeTimeoutMs, 1000);
+  for (const value of ['0', '-1', 'Infinity', 'bad', undefined]) {
+    assert.equal(dialSettings({ CONNECT_TIMEOUT_MS: value }).connectTimeoutMs, 3000);
+    assert.equal(dialSettings({ PROXY_HANDSHAKE_TIMEOUT_MS: value }).proxyHandshakeTimeoutMs, 10000);
+  }
+});
+
+test('initial fallback never replays POST, request bodies, TLS early data or arbitrary streams', () => {
+  const bytes = text => new TextEncoder().encode(text);
+  assert.equal(canReplayInitialData(null), true);
+  assert.equal(canReplayInitialData(bytes('GET / HTTP/1.1\r\nHost: example.com\r\n\r\n')), true);
+  assert.equal(canReplayInitialData(bytes('HEAD / HTTP/1.1\r\nContent-Length: 0\r\n\r\n')), true);
+  for (const text of [
+    'POST / HTTP/1.1\r\n\r\nbody',
+    'GET / HTTP/1.1\r\nContent-Length: 1\r\n\r\nx',
+    'GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n',
+    'GET / HTTP/1.1\r\n', 'arbitrary binary stream',
+  ]) assert.equal(canReplayInitialData(bytes(text)), false, text);
+  assert.equal(canReplayInitialData(Uint8Array.of(22, 3, 3, 0, 1, 1)), true);
+  assert.equal(canReplayInitialData(Uint8Array.of(22, 3, 3, 0, 1, 1, 23, 3, 3, 0, 1, 0)), false);
 });

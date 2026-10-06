@@ -1,5 +1,7 @@
 # 代理逻辑深度对照与故障排查
 
+> 历史记录：下文为 v1.0.7 的审计快照。v1.0.9 已修复其中的 DNS UDP、gRPC EOF、SS 分片地址、代理协商期限及 HTTPS-IP TLS/背压问题，并调整建连默认期限；当前行为、验证与剩余限制见 [v1.0.9 稳定性说明](stability-v1.0.9.md)。
+
 核对日期：2026-09-18。上游固定为 [cmliu/edgetunnel `448a83c`](https://github.com/cmliu/edgetunnel/blob/448a83ced00a43c1d892d5ecbed86a26ea9eeaff/_worker.js)，本地修改前基线为 [`dc663db` / v1.0.6](https://github.com/Brclio/brclio-cloudflare-tz/tree/dc663db0307b64b8d1bbeb111119e34e56b5cf3a)。当天重新查询上游 main，并下载精确提交文件，确认与对照副本逐字节相同，SHA-256 为 `f4deaac96bb6ab5bcdd1b27b20bfce7c51d0210caf4c4620ee291f57b5b83fc7`。
 
 **结论：两边共享大部分代理内核；不能依据 Clash 的一张延迟截图判定整个内核谁更快。原版的本地测速响应掩盖了部分真实出口问题，本项目此前也确实存在需要修正的兼容缺陷。此外，两边共用的握手、路由和 DNS 代码都有可复现问题。** 本轮改进以真实转发正确、出口选择正确和消除无界等待为目标，没有提高并发来掩盖故障，也没有重新合成测速响应。
