@@ -16,7 +16,7 @@
 | 取消发生在 DNS、拨号、上传或下载中 | 残留连接、晚到 DNS 后仍拨号、排空等待无法退出 | 请求独立的连接世代跟踪 pending sockets，取消立即失效并释放流；`tests/tcp-stability.test.mjs`、`tests/xhttp-lifecycle.test.mjs`、`tests/long-connection.test.mjs` |
 | SOCKS5/CONNECT 服务沉默或持续滴流 | 协商无限等候 | 一个总期限覆盖 opened、认证、全部响应分片与首包写入，成功后清除计时器；`tests/proxy-deadline.test.mjs`、`tests/proxy-handshake.test.mjs` |
 | HTTPS 代理地址为 IP | 自定义 TLS 未完整验证证书，存在 30 秒读取策略和提前拉取问题 | 域名/IP 统一原生 TLS，要求受信任且匹配的证书；自签名代理在发送认证信息前失败；`tests/proxy-tls.test.mjs` |
-| 2026 Cloudflare WS 默认二进制类型变化 | 旧同步解析依赖 ArrayBuffer | accept 前明确设置 arraybuffer，协调关闭；长连接集成测试使用生产兼容日期 `2026-09-01` |
+| 2026 Cloudflare WS 默认二进制类型变化 | 旧同步解析依赖 ArrayBuffer | accept 前明确设置 arraybuffer，协调关闭；长连接集成测试覆盖仓库日期 `2026-09-01`，并按 Pages 实际兼容日期 `2026-09-18` 复测 4/4 通过 |
 
 这些测试使用实际 workerd、回环 TCP 服务和构建后的生产函数；生命周期测试的服务绑定只把出站目标映射到受控 TCP 服务。取消在 workerd 内触发，避免把 Miniflare/Undici 对客户端断开的转发行为当作生产流语义。HTTPS 不受信任证书为测试专用固定材料，不包含在发布包内。
 
