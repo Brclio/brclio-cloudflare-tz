@@ -8,21 +8,21 @@
 
 **在线教程：** [部署与使用教程](https://brclio.github.io/brclio-cloudflare-tz/) · [GitHub 自动部署与同步教程](https://brclio.github.io/brclio-cloudflare-tz/github-deploy.html)，点击即可阅读，无需下载。
 
-需要离线阅读时，两篇教程均提供内嵌图片与字体的独立 HTML，可在仓库文件页选择 **Download raw file** 后打开；放在同一目录时可互相跳转。当前仓库版新增 28 张高清操作标注图，支持点击放大、原始尺寸查看和图片下载；也可下载下方 v1.0.9 的教程合集 ZIP，解压后打开。
+需要离线阅读时，两篇教程均提供内嵌图片与字体的独立 HTML，可在仓库文件页选择 **Download raw file** 后打开；放在同一目录时可互相跳转。当前仓库版新增 28 张高清操作标注图，支持点击放大、原始尺寸查看和图片下载；也可下载下方 v1.0.10 的教程合集 ZIP，解压后打开。
 
 ## 快速部署
 
-从 [GitHub Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) 下载预构建文件即可部署，无需安装 Node.js 或自行构建。下面是 **v1.0.9** 的部署包与教程：
+从 [GitHub Release](https://github.com/Brclio/brclio-cloudflare-tz/releases/latest) 下载预构建文件即可部署，无需安装 Node.js 或自行构建。下面是 **v1.0.10** 的部署包与教程：
 
-当前 **v1.0.9** 修复长连接中断相关的 gRPC 半关闭、慢速下载背压、DNS 连续查询、取消后的残留拨号与不安全数据重放，并为代理协商设置总期限；HTTPS 代理统一使用原生 TLS 验证。源码与本版附件保持一致，保留随机订阅默认 64 个、上限 1000 个的功能。故障证据、测试和剩余限制见 [v1.0.9 稳定性说明](docs/stability-v1.0.9.md)；历史对照见 [代理深度排查](docs/proxy-deep-audit.md)。
+当前 **v1.0.10** 在 v1.0.9 长连接修复基础上，补齐 TLS ClientHello 跨消息时的安全回退，并让已知 204 测速地址明确校验 HTTP 204，避免把 400/403 当作健康节点；继续保留禁止业务请求重放的保护。源码与本版附件保持一致，随机订阅默认 64 个、上限 1000 个。真实订阅深测、故障证据与验收边界见 [v1.0.10 稳定性说明](docs/stability-v1.0.10.md)；前版修复见 [v1.0.9 说明](docs/stability-v1.0.9.md)，历史对照见 [代理深度排查](docs/proxy-deep-audit.md)。
 
 | 下载文件 | 用途 |
 | --- | --- |
-| [brclio-edge-pages.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/brclio-edge-pages.zip) | 推荐：直接上传到 Cloudflare Pages 的拖放部署入口 |
-| [_worker.js](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/_worker.js) | 在 Workers 代码编辑器中替换全部示例代码 |
-| [tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/tutorial.html) | 下载后双击打开的完整图文教程 |
-| [github-deploy.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/github-deploy.html) | 通过 GitHub 配置、自动部署、维护与同步 |
-| [brclio-edge-guides.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/brclio-edge-guides.zip) | 推荐：两篇离线教程合集，解压后可互相跳转 |
+| [brclio-edge-pages.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/brclio-edge-pages.zip) | 推荐：直接上传到 Cloudflare Pages 的拖放部署入口 |
+| [_worker.js](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/_worker.js) | 在 Workers 代码编辑器中替换全部示例代码 |
+| [tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/tutorial.html) | 下载后双击打开的完整图文教程 |
+| [github-deploy.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/github-deploy.html) | 通过 GitHub 配置、自动部署、维护与同步 |
+| [brclio-edge-guides.zip](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/brclio-edge-guides.zip) | 推荐：两篇离线教程合集，解压后可互相跳转 |
 
 仓库和 Release 均已公开，部署包与教程可直接下载，无需登录 GitHub。
 
@@ -163,7 +163,7 @@ Pages 的变量和绑定应设置在目标部署环境中，保存后重新部�
 
 ### 完整教程
 
-下载 [tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/tutorial.html) 后，**双击文件即可在浏览器打开**。教程是可独立打开的单文件 HTML，内嵌样式与截图；截图可按原始尺寸查看。另可下载 [GitHub 教程](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/github-deploy.html)。两篇保持原文件名并放在同一文件夹，或直接下载 [教程合集 ZIP](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.9/brclio-edge-guides.zip)。仓库内保留 [教程源码](docs/tutorial-src/README.md)、[后台原始 PNG](docs/tutorial-assets/original/) 和 [Cloudflare 标注图](docs/tutorial-assets/cloudflare/)。
+下载 [tutorial.html](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/tutorial.html) 后，**双击文件即可在浏览器打开**。教程是可独立打开的单文件 HTML，内嵌样式与截图；截图可按原始尺寸查看。另可下载 [GitHub 教程](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/github-deploy.html)。两篇保持原文件名并放在同一文件夹，或直接下载 [教程合集 ZIP](https://github.com/Brclio/brclio-cloudflare-tz/releases/download/v1.0.10/brclio-edge-guides.zip)。仓库内保留 [教程源码](docs/tutorial-src/README.md)、[后台原始 PNG](docs/tutorial-assets/original/) 和 [Cloudflare 标注图](docs/tutorial-assets/cloudflare/)。
 
 教程包含账号与域名准备、KV 创建、Pages / Workers 部署、后台配置、客户端订阅及测速操作，并提供章节导航、进度勾选、命令复制和故障搜索。在 GitHub 文件页查看时，请先下载 HTML 文件再打开。
 

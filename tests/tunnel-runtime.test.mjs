@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Brclio. GPL-2.0-only.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dialSettings, withTimeout, canReplayInitialData } from '../src/tunnel-runtime.js';
+import { dialSettings, withTimeout, canReplayInitialData, createInitialReplayTracker, MAX_INITIAL_TLS_BYTES } from '../src/tunnel-runtime.js';
 
 function assertSettings(actual, expected, message) {
   assert.deepEqual(actual, { connectTimeoutMs: 3000, proxyHandshakeTimeoutMs: 10000, ...expected }, message);
@@ -150,6 +150,77 @@ test('initial fallback never replays POST, request bodies, TLS early data or arb
     'GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n',
     'GET / HTTP/1.1\r\n', 'arbitrary binary stream',
   ]) assert.equal(canReplayInitialData(bytes(text)), false, text);
-  assert.equal(canReplayInitialData(Uint8Array.of(22, 3, 3, 0, 1, 1)), true);
+  assert.equal(canReplayInitialData(Uint8Array.of(22, 3, 3, 0, 1, 1)), false);
   assert.equal(canReplayInitialData(Uint8Array.of(22, 3, 3, 0, 1, 1, 23, 3, 3, 0, 1, 0)), false);
+});
+
+function clientHello(paddingLength = null) {
+  const hello = Buffer.alloc(paddingLength === null ? 50 : 56 + paddingLength);
+  hello.set([22, 3, 3]); hello.writeUInt16BE(hello.length - 5, 3);
+  hello[5] = 1; hello.writeUIntBE(hello.length - 9, 6, 3); hello.set([3, 3], 9);
+  hello.set([0, 0, 2, 0, 47, 1, 0], 43);
+  if (paddingLength !== null) {
+    hello.writeUInt16BE(paddingLength + 4, 50);
+    hello.writeUInt16BE(21, 52); hello.writeUInt16BE(paddingLength, 54);
+  }
+  return hello;
+}
+
+test('initial ClientHello capture accepts the exact record cap and rejects oversized declared or actual lengths', () => {
+  const hello = clientHello(MAX_INITIAL_TLS_BYTES - 56);
+  assert.equal(hello.length, MAX_INITIAL_TLS_BYTES); assert.equal(canReplayInitialData(hello), true);
+  const tracker = createInitialReplayTracker(hello.subarray(0, -1));
+  assert.equal(tracker.replayable, false); assert.equal(tracker.bufferedBytes, MAX_INITIAL_TLS_BYTES - 1);
+  assert.equal(tracker.append(hello.subarray(-1)), true); assert.equal(tracker.replayable, true);
+  assert.deepEqual(Buffer.from(tracker.data), hello);
+  const oversized = clientHello(MAX_INITIAL_TLS_BYTES - 55);
+  assert.equal(canReplayInitialData(oversized), false);
+  for (const bytes of [oversized.subarray(0, 5), oversized]) {
+    const rejected = createInitialReplayTracker(bytes);
+    assert.equal(rejected.replayable, false); assert.equal(rejected.bufferedBytes, 0);
+    assert.equal(rejected.data.length, 0); assert.equal(rejected.append(hello), false);
+  }
+});
+
+test('invalid ClientHello vectors and extension lengths never authorize replay', () => {
+  const hello = clientHello(), extended = clientHello(3);
+  const malformed = [
+    [hello, bytes => { bytes[43] = 33; }],
+    [hello, bytes => { bytes.writeUInt16BE(0, 44); }],
+    [hello, bytes => { bytes.writeUInt16BE(3, 44); }],
+    [hello, bytes => { bytes.writeUInt16BE(65535, 44); }],
+    [hello, bytes => { bytes[48] = 0; }],
+    [hello, bytes => { bytes[48] = 2; }],
+    [extended, bytes => { bytes.writeUInt16BE(6, 50); }],
+    [extended, bytes => { bytes.writeUInt16BE(4, 54); }],
+    [extended, bytes => { bytes.writeUInt16BE(2, 54); }],
+    [extended, bytes => { bytes.writeUIntBE(bytes.length - 10, 6, 3); }],
+  ];
+  for (const [valid, mutate] of malformed) {
+    const bytes = Buffer.from(valid); mutate(bytes);
+    assert.equal(canReplayInitialData(bytes), false);
+    const tracker = createInitialReplayTracker(bytes.subarray(0, 10));
+    assert.equal(tracker.append(bytes.subarray(10)), false);
+    assert.equal(tracker.replayable, false); assert.equal(tracker.bufferedBytes, 0);
+  }
+});
+
+test('any payload after a complete ClientHello permanently disables and frees replay, including separate 0-RTT records', () => {
+  const hello = clientHello(), application = Uint8Array.of(23, 3, 3, 0, 1, 0);
+  for (const extra of [application, Uint8Array.of(22), Buffer.from('POST /messages HTTP/1.1\r\n\r\nbody')]) {
+    const tracker = createInitialReplayTracker(hello);
+    assert.equal(tracker.replayable, true); assert.equal(tracker.append(extra), false);
+    assert.equal(tracker.replayable, false); assert.equal(tracker.bufferedBytes, 0);
+    assert.equal(tracker.data.length, 0); assert.equal(tracker.append(hello), false);
+    const combined = createInitialReplayTracker(Buffer.concat([hello, extra]));
+    assert.equal(combined.replayable, false); assert.equal(combined.bufferedBytes, 0);
+  }
+  for (const bytes of [
+    application, Buffer.from('arbitrary body'), Buffer.from('POST /messages HTTP/1.1\r\n\r\nbody'),
+    Buffer.from('GET / HTTP/1.1\r\nContent-Length: 1\r\n\r\nx'),
+  ]) {
+    const tracker = createInitialReplayTracker(bytes);
+    assert.equal(tracker.replayable, false); assert.equal(tracker.bufferedBytes, 0);
+    assert.equal(tracker.append(hello), false);
+  }
 });

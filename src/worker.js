@@ -15,7 +15,8 @@ import { VERSION } from './version.js';
 import { decodeHunk } from './grpc.js';
 import { createTunnelHandshakeParser, isPossibleTunnelPrefix } from './tunnel-handshake.js';
 import { createShadowsocksAddressParser } from './ss-address.js';
-import { dialSettings, withTimeout, canReplayInitialData } from './tunnel-runtime.js';
+import { dialSettings, withTimeout, canReplayInitialData, createInitialReplayTracker } from './tunnel-runtime.js';
+import { patchClashHealthChecks } from './subscription-health.js';
 import { prependSocketData } from './proxy-streams.js';
 import { createProxyHandshakeDeadline } from './proxy-deadline.js';
 import { createDNSFrameParser, createTrojanUDPParser, encodeDNSFrame, encodeTrojanUDPResponse, exchangeDNSFrame } from './dns-udp.js';
@@ -826,6 +827,7 @@ function 有效数据长度(data) {
 
 function 失效TCP连接世代(remoteConnWrapper) {
 	if (!remoteConnWrapper) return;
+	remoteConnWrapper.releaseInitialReplay?.();
 	remoteConnWrapper.cancelled = true;
 	remoteConnWrapper.generation = (Number.isInteger(remoteConnWrapper.generation) ? remoteConnWrapper.generation : 0) + 1;
 	const socket = remoteConnWrapper.socket;
@@ -1053,7 +1055,10 @@ async function 处理gRPC请求(request, yourUUID, 反代上下文 = {}) {
 				},
 				关闭连接,
 				名称: 'gRPC上行',
-				标记继续上传: () => { remoteConnWrapper.uploadContinued = true; }
+				标记继续上传: chunk => {
+					if (remoteConnWrapper.captureInitialUpload) return remoteConnWrapper.captureInitialUpload(chunk);
+					else remoteConnWrapper.uploadContinued = true;
+				}
 			});
 
 			const 写入远端 = async (payload, allowRetry = true) => {
@@ -1229,7 +1234,10 @@ async function 处理WS请求(request, yourUUID, url, 反代上下文 = {}) {
 	};
 
 	const 上行写入队列 = WS上行写入队列 = 创建上行写入队列({
-		标记继续上传: () => { remoteConnWrapper.uploadContinued = true; },
+		标记继续上传: chunk => {
+			if (remoteConnWrapper.captureInitialUpload) return remoteConnWrapper.captureInitialUpload(chunk);
+			else remoteConnWrapper.uploadContinued = true;
+		},
 		获取写入器: () => {
 			const socket = remoteConnWrapper.socket;
 			if (!socket) return null;
@@ -1975,10 +1983,38 @@ async function forwardataTCP(host, portNum, rawData, ws, respHeader, remoteConnW
 	log(`[TCP转发] 目标: ${host}:${portNum} | 反代IP: ${ctx反代IP} | 反代兜底: ${ctx反代兜底 ? '是' : '否'} | 反代类型: ${ctx代理类型 || 'proxyip'} | 全局: ${ctx代理全局 ? '是' : '否'}`);
 	let 已通过代理发送首包 = false;
 	remoteConnWrapper.safeInitialReplay = canReplayInitialData(rawData);
+	const 初始重放跟踪器 = 仅建立连接 ? null : createInitialReplayTracker(rawData);
+	if (初始重放跟踪器) {
+		remoteConnWrapper.captureInitialUpload = chunk => {
+			const 属于初始握手 = 初始重放跟踪器.append(chunk);
+			remoteConnWrapper.uploadContinued = !属于初始握手;
+			remoteConnWrapper.safeInitialReplay = 初始重放跟踪器.replayable;
+			rawData = 属于初始握手 ? 初始重放跟踪器.data : null;
+			if (!属于初始握手 || !初始重放跟踪器.replayable) return null;
+			let resolve, reject;
+			const promise = new Promise((a, b) => { resolve = a; reject = b; });
+			promise.catch(() => { });
+			const pending = { promise, reject, timeoutMs: 连接超时毫秒 };
+			remoteConnWrapper.pendingInitialUpload = pending;
+			return error => {
+				if (error) { remoteConnWrapper.safeInitialReplay = false; reject(error); }
+				else resolve();
+				if (remoteConnWrapper.pendingInitialUpload === pending) remoteConnWrapper.pendingInitialUpload = null;
+			};
+		};
+		remoteConnWrapper.releaseInitialReplay = () => {
+			初始重放跟踪器.stop(); rawData = null; 木马反代首包数据 = null; 木马反代握手数据 = null;
+			remoteConnWrapper.safeInitialReplay = false;
+			remoteConnWrapper.pendingInitialUpload?.reject(new Error('Initial TLS replay released'));
+			remoteConnWrapper.pendingInitialUpload = null;
+			remoteConnWrapper.captureInitialUpload = null;
+			remoteConnWrapper.releaseInitialReplay = null;
+		};
+	}
 	const TCP连接 = 创建请求TCP连接器(request, remoteConnWrapper);
 	const 使用木马反代 = 允许木马反代 && (反代上下文.木马反代地址 || null);
 	const 木马反代目标 = 使用木马反代 ? 反代上下文.木马反代地址 : null;
-	const 木马反代握手数据 = 使用木马反代 ? 提取木马反代握手数据(木马反代首包数据, rawData) : null;
+	let 木马反代握手数据 = 使用木马反代 ? 提取木马反代握手数据(木马反代首包数据, rawData) : null;
 	let 待发送响应头 = respHeader;
 	const 取出响应头 = () => {
 		const header = 待发送响应头;
@@ -2168,7 +2204,7 @@ async function forwardataTCP(host, portNum, rawData, ws, respHeader, remoteConnW
 		let 本次发送首包 = false, 本次首包数据 = null;
 		if (使用木马反代) {
 			if (允许发送首包 && !已通过代理发送首包 && 有效数据长度(木马反代首包数据) > 0) {
-				本次首包数据 = 木马反代首包数据;
+				本次首包数据 = 拼接字节数据(木马反代握手数据, rawData);
 				本次发送首包 = 有效数据长度(rawData) > 0;
 			} else {
 				本次首包数据 = 木马反代握手数据;
@@ -2538,10 +2574,13 @@ function 创建上行写入队列({ 获取写入器, 获取连接任务 = null, 
 					let writer = await 等待可用写入器();
 					if (closed) break;
 					if (!writer) throw new Error(`${名称}: remote writer unavailable`);
+					let 完成初始写入;
 					try {
-						标记继续上传?.();
+						完成初始写入 = 标记继续上传?.(item.chunk);
 						await writer.write(item.chunk);
+						完成初始写入?.();
 					} catch (err) {
+						完成初始写入?.(err);
 						释放写入器?.();
 						if (closed) break;
 						// The native write may have accepted bytes before rejecting.
@@ -2818,6 +2857,9 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, is
 	let header = headerData, hasData = false, reader, useBYOB = false, readError = null;
 	const BYOB单次读取上限 = 64 * 1024;
 	const 当前连接仍有效 = () => !isCurrentSocket || isCurrentSocket();
+	const 可回退初始连接 = () => !hasData && retryFunc && remoteConnWrapper?.safeInitialReplay
+		&& !remoteConnWrapper.uploadContinued && !remoteConnWrapper.uploadEnded
+		&& webSocket.readyState === WebSocket.OPEN && 当前连接仍有效();
 	const 下行发送器 = 创建下行Grain发送器(webSocket, header, 当前连接仍有效);
 	header = null;
 	const 下行控制器 = { 停止并刷新: () => 下行发送器.停止并刷新() };
@@ -2835,6 +2877,7 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, is
 				if (done) break;
 				if (!value || value.byteLength === 0) continue;
 				hasData = true;
+				remoteConnWrapper?.releaseInitialReplay?.();
 				if (value.byteLength >= 下行Grain包字节) {
 					await 下行发送器.flush();
 					await 下行发送器.直接发送(value);
@@ -2850,6 +2893,7 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, is
 				if (done) break;
 				if (!value || value.byteLength === 0) continue;
 				hasData = true;
+				remoteConnWrapper?.releaseInitialReplay?.();
 				if (value.byteLength >= 下行Grain包字节) {
 					await 下行发送器.flush();
 					await 下行发送器.直接发送(value);
@@ -2867,11 +2911,22 @@ async function connectStreams(remoteSocket, webSocket, headerData, retryFunc, is
 			try { await 下行发送器.停止并刷新() } catch (err) { readError ||= err }
 		}
 		if (remoteConnWrapper?.downlinkController === 下行控制器) remoteConnWrapper.downlinkController = null;
+		// The reader can end before the ClientHello continuation write settles. Closing
+		// first would reject that healthy write and let upload cleanup kill fallback.
+		const pendingInitialUpload = remoteConnWrapper?.pendingInitialUpload;
+		if (可回退初始连接() && pendingInitialUpload) {
+			try {
+				await withTimeout(pendingInitialUpload.promise, pendingInitialUpload.timeoutMs, 'Initial TLS write timed out');
+			} catch (err) {
+				readError ||= err;
+				remoteConnWrapper.releaseInitialReplay?.();
+			}
+		}
 		try { await reader.cancel() } catch (e) { }
 		try { reader.releaseLock() } catch (e) { }
 		try { remoteSocket.close()?.catch?.(() => {}) } catch (e) { }
 	}
-	if (!hasData && retryFunc && remoteConnWrapper?.safeInitialReplay && !remoteConnWrapper.uploadContinued && !remoteConnWrapper.uploadEnded && webSocket.readyState === WebSocket.OPEN && 当前连接仍有效()) {
+	if (可回退初始连接()) {
 		try {
 			await retryFunc();
 			return;
@@ -4527,7 +4582,7 @@ function Clash订阅配置文件热补丁(Clash_原始订阅内容, config_JSON 
 	const gRPCUserAgent = (typeof config_JSON?.gRPCUserAgent === 'string' && config_JSON.gRPCUserAgent.trim()) ? config_JSON.gRPCUserAgent.trim() : null;
 	const 需要处理gRPC = config_JSON?.传输协议 === "grpc" && Boolean(gRPCUserAgent);
 	const gRPCUserAgentYAML = gRPCUserAgent ? JSON.stringify(gRPCUserAgent) : null;
-	let clash_yaml = Clash_原始订阅内容.replace(/mode:\s*Rule\b/g, 'mode: rule');
+	let clash_yaml = patchClashHealthChecks(Clash_原始订阅内容.replace(/mode:\s*Rule\b/g, 'mode: rule'));
 
 	const baseDnsBlock = `dns:
   enable: true
